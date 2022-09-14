@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <style>
+      .hand {position: absolute; bottom: 0px; display: flex; width: 100%; max-height: 50%}
+      #table .card {max-width: 25%}
+      img {max-width: 100%; max-height: 100%}
+    </style>
+  </head>
+  <body style="font-weight: bold; font-size: 150%; margin: 0">
+    <div id="enter" style="position: absolute; z-index: 1"></div>
+    <div id="table" style="position: absolute; top: 0px; left: 0px; display: flex; width: 50%; height: 50%"></div>
+    <div id="mbox"  style="position: absolute; top: 0px; left: 50%; width: 40%; z-index: 1"></div>
+    <div id="trump" style="position: absolute; top: 0px; right: 0px; width: 10%"></div>
+
+    <script src="util.js"></script>
+    <script src="frontend.js"></script>
+    <script>
+      const create_button = player => {
+        const input = document.createElement("input")
+        input.type = "button"
+        input.value = player
+        input.style = "font-size: 70px"
+        input.onclick = ({target}) => enter(target)
+        return input
+      }
+      const players = params.getAll("player")
+      for (const p of players)
+        q("#enter").appendChild(create_button(p))
+    </script>
+  </body>
+</html>
+
