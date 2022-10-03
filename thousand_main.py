@@ -4,24 +4,23 @@ import itertools
 import sys
 import gaming
 import card_game
+import game_io
 from playing_cards import Rank
 import playing_cards
-from player_io import EvtType, send_event_all, send_text_all, send_deal
+from player_io import EvtType, send_event_all, send_text_all
 import player_io
 import util
 import thousand
-#pass 4 человека
 
 parser = argparse.ArgumentParser(description="Thousand card game")
-player_io.add_cli_arguments(parser)
+player_io.add_cli_args(parser)
+gaming.add_team_args(parser)
 args = parser.parse_args()
 
 game = thousand.Thousand()
-players = player_io.new_players(game.players_number, 
-                                after_reconnect=lambda io: send_deal(io.player), **vars(args))
-
-first_player = random.choice(players)
-gaming.player_starts(players, first_player)
+players = player_io.new_players(game.players_number, **vars(args))
+gaming.assign_to_teams(players, team_scores=args.team_scores)
+gaming.player_starts(players, random.choice(players))
 parties_cycle = itertools.cycle(players.copy())
 next(parties_cycle)
 
@@ -69,9 +68,7 @@ while True:
     penalize_dealer()
     continue
 
-  widdle = playing_cards.deal(players, game.deck, game.widdle_amount)
-  for p in players:
-    send_deal(p)
+  widdle = game_io.deal(players, game, 7)
 
   if golden_party:
     bid_winner = players[0]
@@ -82,14 +79,14 @@ while True:
       double_score = False
   other_player1, other_player2 = set(players) - {bid_winner}
 
-  card_game.attach_cards(bid_winner, widdle)
+  game_io.attach_cards(bid_winner, widdle)
   
   bid_winner_questioned = False
   for p in players:
-    widdle_can_be_rejected = game.widdle_can_be_rejected(widdle) \
+    widdle_can_be_rejected = thousand.widdle_can_be_rejected(game, widdle) \
       if p == bid_winner else False
 
-    if widdle_can_be_rejected or game.hand_can_be_rejected(p.cards, p == players[0]):
+    if widdle_can_be_rejected or thousand.hand_can_be_rejected(game, p.cards, p == players[0]):
       if p.io.select_yesno("Пересдать?"):
         redeals_amount += 1
         send_text_all(players, f"{p} попросил пересдать")
@@ -99,11 +96,11 @@ while True:
 
   if bid_winner_questioned or bid_winner.io.select_yesno("Хотите играть?"):
     bid_winner.io.send_event(EvtType.TEXT, f"Выберите карту для {other_player1}")
-    card1 = bid_winner.io.select_card(bid_winner.cards)
-    card_game.reattach_cards(other_player1, card1)
+    card1 = game_io.select_card(bid_winner, bid_winner.cards, detached=True)
+    game_io.attach_cards(other_player1, card1)
     bid_winner.io.send_event(EvtType.TEXT, f"Выберите карту для {other_player2}")
-    card2 = bid_winner.io.select_card(bid_winner.cards)
-    card_game.reattach_cards(other_player2, card2)
+    card2 = game_io.select_card(bid_winner, bid_winner.cards, detached=True)
+    game_io.attach_cards(other_player2, card2)
     assert {len(p.cards) for p in players} == {game.hand_amount()}
     card_game.party(players, game, can_player_select_trump=True)
   else:
@@ -114,9 +111,9 @@ while True:
     send_text_all(players, f"{bid_winner} решил не играть ({bid})")
   party_occured()
 
-  for player in players:
-    thousand.calc_score(player, bid_winner, bid, double_score)
-    if player.score >= 1000:
+  for p in players:
+    thousand.calc_score(p, bid_winner, bid, double_score)
+    if p.score >= 1000:
       send_text_all(players, f"{p} победил!")
       sys.exit(0)
 

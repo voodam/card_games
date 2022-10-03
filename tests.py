@@ -2,64 +2,87 @@ import shlex
 import subprocess
 import time
 import argparse
-from playing_cards import Rank, Suit, get as c
+from playing_cards import Rank, Suit, card
+import playing_cards
 import card_game
 import gaming
 import goat
 import thousand as t
+import fool as f
+import board_game
+from board_game import SegType
 
 parser = argparse.ArgumentParser(description="Unit and integration tests")
 parser.add_argument("--no-integration", dest="integration", action="store_false", help="Team start scores")
 args = parser.parse_args()
 
+p1 = gaming.Player("")
+p2 = gaming.Player("")
+p3 = gaming.Player("")
+p4 = gaming.Player("")
+# тысяча
+widdle = playing_cards.deal([p1, p2, p3], playing_cards.deck_from(Rank.Nine), 7)
+assert len(widdle) == 3
+for p in [p1, p2, p3]:
+  assert len(p.cards) == 7
+# козел
+assert not playing_cards.deal([p1, p2, p3, p4], playing_cards.deck_from(Rank.Seven))
+for p in [p1, p2, p3, p4]:
+  assert len(p.cards) == 8
+# дурак
+deck = playing_cards.deal([p1, p2, p3], playing_cards.deck_from(Rank.Six), 6)
+assert len(deck) == 36 - 3*6
+for p in [p1, p2, p3]:
+  assert len(p.cards) == 6
+
 goat = goat.Goat()
 # туз другой масти не бьет
-assert goat.hitting_card([c("♦K"), c("♠A")], Suit("♣"), ) == c("♦K")
+assert card_game.hitting_card(goat, [card("♦K"), card("♠A")], Suit("♣")) == card("♦K")
 # туз козырь бьет другую масть
-assert goat.hitting_card([c("♦K"), c("♠A")], Suit("♠")) == c("♠A")
+assert card_game.hitting_card(goat, [card("♦K"), card("♠A")], Suit("♠")) == card("♠A")
 # десятка бьет короля
-assert goat.hitting_card([c("♦K"), c("♦10")], Suit("♣")) == c("♦10")
+assert card_game.hitting_card(goat, [card("♦K"), card("♦10")], Suit("♣")) == card("♦10")
 # семерка козырь бъет валет
-assert goat.hitting_card([c("♦7"), c("♣J")], Suit("♦")) == c("♦7")
+assert card_game.hitting_card(goat, [card("♦7"), card("♣J")], Suit("♦")) == card("♦7")
 # туз не бьет валет той же масти
-assert goat.hitting_card([c("♦J"), c("♦A")], Suit("♦")) == c("♦J")
-assert goat.hitting_card([c("♦J"), c("♦A")], Suit("♠")) == c("♦J")
+assert card_game.hitting_card(goat, [card("♦J"), card("♦A")], Suit("♦")) == card("♦J")
+assert card_game.hitting_card(goat, [card("♦J"), card("♦A")], Suit("♠")) == card("♦J")
 # валет бьет туз той же масти
-assert goat.hitting_card([c("♦A"), c("♦J")], Suit("♦")) == c("♦J")
-assert goat.hitting_card([c("♦A"), c("♦J")], Suit("♠")) == c("♦J")
+assert card_game.hitting_card(goat, [card("♦A"), card("♦J")], Suit("♦")) == card("♦J")
+assert card_game.hitting_card(goat, [card("♦A"), card("♦J")], Suit("♠")) == card("♦J")
 # восемь бьет семь
-assert goat.hitting_card([c("♦7"), c("♦8")], Suit("♠")) == c("♦8")
+assert card_game.hitting_card(goat, [card("♦7"), card("♦8")], Suit("♠")) == card("♦8")
 
-player_cards = [c("♥8"), c("♠10")]
+player_cards = [card("♥8"), card("♠10")]
 # первая положенная карта может быть любой
 assert goat.allowed_cards(player_cards, [], Suit("♥")) == player_cards
 # если положили козырь, но его нет, то можно класть любую
-assert goat.allowed_cards(player_cards, [c("♦K")], Suit("♦")) == player_cards
+assert goat.allowed_cards(player_cards, [card("♦K")], Suit("♦")) == player_cards
 # если положили валет, но козырей нет, то можно класть карту той же масти
-assert goat.allowed_cards(player_cards, [c("♠J")], Suit("♦")) == player_cards
+assert goat.allowed_cards(player_cards, [card("♠J")], Suit("♦")) == player_cards
 # если положили козырь, то нужно класть козырь
-assert goat.allowed_cards(player_cards, [c("♥K")], Suit("♥")) == [c("♥8")]
+assert goat.allowed_cards(player_cards, [card("♥K")], Suit("♥")) == [card("♥8")]
 # если масти нет, то можно класть любую
-assert goat.allowed_cards(player_cards, [c("♣K")], Suit("♥")) == player_cards
+assert goat.allowed_cards(player_cards, [card("♣K")], Suit("♥")) == player_cards
 
-player_cards = [c("♥8"), c("♠J")]
+player_cards = [card("♥8"), card("♠J")]
 # если положили козырь, то нужно класть валет
-assert goat.allowed_cards(player_cards, [c("♦K")], Suit("♦")) == [c("♠J")]
+assert goat.allowed_cards(player_cards, [card("♦K")], Suit("♦")) == [card("♠J")]
 # если положили масть, то нужно класть ее, а не валет
-player_cards = [c("♠8"), c("♠J")]
-assert goat.allowed_cards(player_cards, [c("♠K")], Suit("♦")) == [c("♠8")]
-assert goat.allowed_cards(player_cards, [c("♠K")], Suit("♠")) == player_cards
+player_cards = [card("♠8"), card("♠J")]
+assert goat.allowed_cards(player_cards, [card("♠K")], Suit("♦")) == [card("♠8")]
+assert goat.allowed_cards(player_cards, [card("♠K")], Suit("♠")) == player_cards
 
 thousand = t.Thousand()
 p = gaming.Player("")
 t.init_player(p)
-p.cards = [c("♥K"), c("♥Q"), c("♦K"), c("♦Q"), c("♣K"), c("♣Q"), c("♠K"), c("♠Q")]
+p.cards = [card("♥K"), card("♥Q"), card("♦K"), card("♦Q"), card("♣K"), card("♣Q"), card("♠K"), card("♠Q")]
 assert thousand.allowed_trumps(p) == set()
-p.cards = [c("♥K"), c("♥Q"), c("♦K"), c("♦Q"), c("♣K"), c("♣Q")]
+p.cards = [card("♥K"), card("♥Q"), card("♦K"), card("♦Q"), card("♣K"), card("♣Q")]
 assert thousand.allowed_trumps(p) == {Suit("♥"), Suit("♦"), Suit("♣")}
-p.cards = [c("♥K"), c("♥Q"), c("♣K"), c("♣Q")]
+p.cards = [card("♥K"), card("♥Q"), card("♣K"), card("♣Q")]
 assert thousand.allowed_trumps(p) == {Suit("♥"), Suit("♣")}
-p.cards = [c("♠Q"), c("♦K"), c("♠A"), c("♥10")]
+p.cards = [card("♠Q"), card("♦K"), card("♠A"), card("♥10")]
 assert thousand.allowed_trumps(p) == set()
 
 t.init_player(p)
@@ -202,13 +225,99 @@ assert not p1.on_barrel
 assert p1.score == 760
 assert p1.barrel_parties == 0
 
+fool = f.Fool(players_number=2)
+p = gaming.Player("")
+
+p.cards = [card("♥K"), card("♥Q"), card("♦K"), card("♦Q"), card("♥8"), card("♠J")]
+cards = f.TrickCards({card("♣Q"): card("♣K"), card("♣J"): None})
+assert f.attacker_cards(p, cards) == [card("♥K"), card("♥Q"), card("♦K"), card("♦Q"), card("♠J")]
+cards.add_unbeaten(card("♠10"))
+cards.add_unbeaten(card("♠8"))
+assert f.attacker_cards(p, cards) == p.cards
+cards = f.TrickCards()
+assert f.attacker_cards(p, cards) == p.cards
+p.cards = []
+assert f.attacker_cards(p, cards) == []
+
+p.cards = [card("♦K"), card("♥A"), card("♥10"), card("♣A"), card("♠J"), card("♠6")]
+cards = f.TrickCards({card("♣Q"): card("♣K"), card("♠10"): None, card("♥Q"): None})
+assert f.defender_cards(fool, p, cards, Suit("♥")) == [card("♥A"), card("♥10"), card("♠J")]
+assert f.defender_cards(fool, p, cards, Suit("♣")) == [card("♥A"), card("♣A"), card("♠J")]
+assert f.defender_cards(fool, p, cards, Suit("♠")) == [card("♥A"), card("♠J"), card("♠6")]
+assert f.defender_cards(fool, p, cards, Suit("♦")) == [card("♦K"), card("♥A"), card("♠J")]
+cards = f.TrickCards()
+assert f.defender_cards(fool, p, cards, Suit("♥")) == []
+p.cards = [card("♦8"), card("♥7"), card("♥9")]
+cards = f.TrickCards({card("♣Q"): None, card("♠10"): None, card("♥Q"): None})
+assert f.defender_cards(fool, p, cards, Suit("♣")) == []
+p.cards = []
+assert f.defender_cards(fool, p, cards, Suit("♣")) == []
+
+cards = f.TrickCards({card("♦6"): card("♦7"), card("♦10"): None, card("♦Q"): None, card("♥6"): None, card("♥A"): None})
+assert f.beat(fool, card("♦K"), cards, Suit("♣")) == card("♦Q")
+assert f.beat(fool, card("♦J"), cards, Suit("♣")) == card("♦10")
+assert f.beat(fool, card("♥8"), cards, Suit("♥")) == card("♥6")
+assert f.beat(fool, card("♣7"), cards, Suit("♣")) == card("♥A")
+cards = f.TrickCards({card("♦10"): None})
+try:
+  f.beat(fool, card("♣K"), cards, Suit("♥"))
+except AssertionError as e:
+  assert str(e) == "No cards to beat available"
+
+cards = [card("♦6"), card("♥6"), card("♠6"), card("♣6"), card("♠7"), card("♣7")]
+deck = playing_cards.deck_from(Rank.Eight)
+new_cards = f.replenish_cards(cards, deck)
+assert len(new_cards) == 0
+assert len(deck) == 28
+cards = [card("♦6"), card("♥6"), card("♠6"), card("♣6"), card("♠7"), card("♣7"), card("♦7"), card("♥7")]
+new_cards = f.replenish_cards(cards, deck)
+assert len(new_cards) == 0
+assert len(deck) == 28
+cards = [card("♦6"), card("♥6")]
+last_card = deck[-1]
+new_cards = f.replenish_cards(cards, deck)
+assert len(new_cards) == 4
+assert len(deck) == 24
+assert last_card == deck[-1]
+cards = []
+new_cards = f.replenish_cards(cards, deck)
+assert len(new_cards) == 6
+assert len(deck) == 18
+assert last_card == deck[-1]
+cards = [card("♠6"), card("♣6")]
+deck = [card("♦6"), card("♥6")]
+new_cards = f.replenish_cards(cards, deck)
+assert len(new_cards) == 2
+assert len(deck) == 0
+cards = []
+deck = []
+new_cards = f.replenish_cards(cards, deck)
+assert len(new_cards) == 0
+assert len(deck) == 0
+
+assert board_game.get_segment_coords([5, 0], [0, 0]) == ([[1, 0], [2, 0], [3, 0], [4, 0]], SegType.LINE)
+assert board_game.get_segment_coords([3, 5], [5, 5]) == ([[4, 5]], SegType.LINE)
+assert board_game.get_segment_coords([2, 6], [2, 2]) == ([[2, 3], [2, 4], [2, 5]], SegType.LINE)
+assert board_game.get_segment_coords([6, 7], [6, 4]) == ([[6, 5], [6, 6]], SegType.LINE)
+assert board_game.get_segment_coords([4, 4], [8, 8]) == ([[5, 5], [6, 6], [7, 7]], SegType.DIAG)
+assert board_game.get_segment_coords([8, 4], [5, 1]) == ([[6, 2], [7, 3]], SegType.DIAG)
+assert board_game.get_segment_coords([3, 7], [6, 4]) == ([[4, 6], [5, 5]], SegType.DIAG)
+assert board_game.get_segment_coords([6, 7], [6, 7]) == ([], SegType.LINE)
+assert board_game.get_segment_coords([6, 7], [6, 8]) == ([], SegType.LINE)
+assert board_game.get_segment_coords([6, 7], [4, 4]) == ([], SegType.NOT_SEGMENT)
+
 if args.integration:
   command = f"python3 goat_main.py --cpu-players={goat.players_number}"
   server = subprocess.Popen(shlex.split(command), stdout=subprocess.DEVNULL)
-  time.sleep(2)
+  time.sleep(5)
   server.kill()
 
   command = f"python3 thousand_main.py --cpu-players={thousand.players_number}"
+  server = subprocess.Popen(shlex.split(command), stdout=subprocess.DEVNULL)
+  time.sleep(10)
+  server.kill()
+
+  command = f"python3 fool_main.py --cpu-players=5 --total-players=5"
   server = subprocess.Popen(shlex.split(command), stdout=subprocess.DEVNULL)
   time.sleep(10)
   server.kill()

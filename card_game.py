@@ -1,9 +1,9 @@
-from typing import final
 import itertools
 from playing_cards import Rank, Suit
 import playing_cards
 from player_io import EvtType, send_event_all, send_text_all
 import player_io
+import game_io
 import gaming
 import util
 
@@ -16,16 +16,12 @@ ace_ten_king_points = {
 }
 
 class CardGame:
-  def __init__(self, deck, players_number, widdle_amount = 0):
+  def __init__(self, deck, players_number):
     self.deck = deck
     self.players_number = players_number
-    self.widdle_amount = widdle_amount
 
-  def hand_amount(self, after_bidding = True):
-    free_deck_len = len(self.deck)
-    if not after_bidding:
-      free_deck_len -= self.widdle_amount
-    return free_deck_len // self.players_number
+  def hand_amount(self):
+    return len(self.deck) // self.players_number
 
   def allowed_cards(self, player_cards, trick_cards, trump):
     if not trick_cards:
@@ -33,34 +29,45 @@ class CardGame:
     
     return [c for c in player_cards if self.eq_suits(trick_cards[0], c, trump)] or player_cards
 
-  @final
-  def hitting_card(self, trick_cards, trump):
-    def key(c):
-      return self.card_hit_value(c, trick_cards, trump)
-    return sorted(trick_cards, key=key, reverse=True)[0]
+  def eq_suits(self, card1, card2, trump):
+    return card1.suit == card2.suit
 
-  def card_hit_value(self, card, trick_cards, trump):
+  def is_trump(self, card, trump):
+    return card.suit == trump
+
+  def card_hit_value(self, card, trump, trick_cards = None):
+    """The sense of the algorithm is: "rely on card points, but if it's zero, rely on it's rank".
+       So, override card_points method to rely not only on a rank."""
+
+    total_rank = self.card_points(card) + list(Rank).index(card.rank)
+
     if card.suit == trump:
-      return self.card_points(card) + list(Rank).index(card.rank) + 50
-    elif card.suit == trick_cards[0].suit:
-      return self.card_points(card) + list(Rank).index(card.rank)
+      return total_rank + 50
+    elif not trick_cards or card.suit == trick_cards[0].suit:
+      return total_rank
     else:
       return 0
 
   def card_points(self, card):
-    return ace_ten_king_points.get(card.rank, 0)
+    return 0
 
-  def eq_suits(self, card1, card2, trump):
-    return card1.suit == card2.suit
+def can_hit(game, hit_card, target_card, trump):
+  return game.card_hit_value(hit_card, trump, [target_card]) > game.card_hit_value(target_card, trump)
 
-def attach_cards(player, cards):
-  playing_cards.attach_to_player(cards, player)
-  player_io.send_deal(player)
+def can_hit_any(game, hit_card, target_cards, trump):
+  return any(can_hit(game, hit_card, c, trump) for c in target_cards)
 
-def reattach_cards(to_player, cards):
-  playing_cards.detach_from_player(cards)
-  playing_cards.attach_to_player(cards, to_player)
-  player_io.send_deal(to_player)
+def sort_by_hit_value(game, trick_cards, trump):
+  return sorted(trick_cards, key=lambda c: game.card_hit_value(c, trump, trick_cards))
+
+def hitting_card(game, trick_cards, trump):
+  return sort_by_hit_value(game, trick_cards, trump)[-1]
+
+def sort_by_rank_suit(game, trick_cards, trump = None):
+  def key(c):
+    suit_value = 10 if trump and game.is_trump(c, trump) else list(Suit).index(c.suit)
+    return suit_value * 100 + list(Rank).index(c.rank)
+  return sorted(trick_cards, key=key)
 
 # Trick-taking game reusable components
 
@@ -96,8 +103,7 @@ def bidding(players, game, start_min_bid = None):
   send_text_all(players, f"{bid_players[0]} победил в торгах ({bid})")
   return bid_players[0], bid
 
-def trick(players, game, points_holder = util.id,
-          can_player_select_trump = False, trump = None):
+def trick(players, game, can_player_select_trump = False, trump = None):
   send_event_all(players, EvtType.TRICK)
   trick_cards = []
 
@@ -116,28 +122,25 @@ def trick(players, game, points_holder = util.id,
   for p in players:
     send_text_all(players, f"Ходит {p}")
     cards = game.allowed_cards(p.cards, trick_cards, trump)
-    card = p.io.select_card(cards)
+    card = game_io.put_card_on_table(p, players, cards)
     trick_cards.append(card)
-    send_event_all(players, EvtType.CARD, {"card": card, "from": p})
 
-  taker = game.hitting_card(trick_cards, trump).player
+  taker = hitting_card(game, trick_cards, trump).player
   points = sum(game.card_points(card) for card in trick_cards)
-  points_holder(taker).points += points
+  taker.team.points += points
   send_text_all(players, f"{taker} забирает взятку ({points})")
 
-  for card in trick_cards:
-    playing_cards.detach_from_player(card)
+  playing_cards.detach_from_player(trick_cards)
   gaming.player_starts(players, taker)
 
 def init_player(p):
   p.selected_trumps = set()
 
-def party(players, game, points_holder = util.id,
-          can_player_select_trump = False, trump = None):
+def party(players, game, can_player_select_trump = False, trump = None):
   for p in players:
     init_player(p)
-    points_holder(p).points = 0
+    p.team.points = 0
 
   while players[0].cards:
-    trick(players, game, points_holder, can_player_select_trump, trump)
+    trick(players, game, can_player_select_trump, trump)
 

@@ -1,7 +1,6 @@
 const EvtType = {
   // to client
   TEXT: "TEXT",
-  GAME: "GAME",
   TRICK: "TRICK",
   DEAL: "DEAL",
   TRUMP: "TRUMP",
@@ -32,11 +31,10 @@ class Deck {
   }
 
   add(card) {
-    if (this.delay) {
+    if (this.delay)
       this.after_delay.push(() => this.add(card))
-      return
-    }
-    this.container.appendChild(card)
+    else
+      this.container.appendChild(card)
   }
 
   clear() {
@@ -45,11 +43,12 @@ class Deck {
 
   clear_delayed(delay_ms) {
     this.delay = true
+
     setTimeout(() => {
-      this.clear()
       this.delay = false
-      for (const callback of this.after_delay)
-        callback()
+      this.clear()
+      for (const cb of this.after_delay)
+        
       this.after_delay = []
     }, delay_ms)
   }
@@ -81,7 +80,7 @@ const deck_set_all = (deck, cards) => {
 const create_card = (rank, suit, title = "") => {
   const container = document.createElement("div")
   const image = document.createElement("img")
-  image.src = `img/${suit}_${rank}.png`
+  image.src = `img/cards/${suit}_${rank}.png`
   const title_container = document.createElement("div")
   title_container.textContent = title
 
@@ -146,13 +145,14 @@ class MessageBox {
   }
 }
 
-const listen_event_showhide = (io, hand, req_event, cb, resp_event) =>
-  io.listen_event(req_event, async payload => {
+const listen_showhide = (io, hand, req_event, cb, resp_event) =>
+  ws_listen_send(io, req_event, async payload => {
     await show_hand(hand)
-    const res = await cb(payload)
+    // i don't know why timeout is required to hand can be shown
+    const res = await promise_timeout(() => cb(payload), 100)
     hide_hand(hand)
-    io.send_event(resp_event, res)
-  })
+    return res
+  }, resp_event)
 
 const input_bid = ({min_bid, max_bid, step, can_skip, message}) => {
   let bid
@@ -165,45 +165,34 @@ const input_bid = ({min_bid, max_bid, step, can_skip, message}) => {
   return bid
 }
 
-const enter_container = q("#enter")
 const mbox = new MessageBox(q("#mbox"))
 const table = new Deck(q("#table"))
 const trump = new Deck(q("#trump"))
-let is_first_enter = true
 
-const enter = button => {
-  button.remove()
-  const name = button.value
-  const io = new SimpleWebsocket(WEBSOCKET_URL)
-  io.send_event(EvtType.ENTER, name)
+const common_events = io => {
+  io.listen(EvtType.TRICK, () => table.clear_delayed(TABLE_CLEAR_DELAY_MS))
+  io.listen(EvtType.TRUMP, suit => deck_set(trump, create_ace(suit)))
+  io.listen(EvtType.CARD, ({from, card: {rank, suit}}) => table.add(create_card(rank, suit, from)))
+}
+
+const personal_events = io => {
   const hand = new Deck(create_hand(name))
 
-  if (is_first_enter) {
-    is_first_enter = false
-    // same events for all players
-    io.listen_event(EvtType.TRICK, () => table.clear_delayed(TABLE_CLEAR_DELAY_MS))
-    io.listen_event(EvtType.TRUMP, suit => deck_set(trump, create_ace(suit)))
-    io.listen_event(EvtType.CARD, ({from, card: {rank, suit}}) => table.add(create_card(rank, suit, from)))
-  }
-
-  io.listen_event(EvtType.TEXT, text => mbox.show_text(text))
-  io.listen_event(EvtType.DEAL, cards => {
-    enter_container.remove()
+  io.listen(EvtType.TEXT, text => mbox.show_text(text))
+  io.listen(EvtType.DEAL, cards => {
     deck_set_all(hand, cards.map(({rank, suit}) => create_card(rank, suit)))
   })
-  // i don't know why timeout is required to hand can be shown
-  listen_event_showhide(io, hand, EvtType.SELECT_YESNO,
-    message => promise_timeout(() => confirm(message), 1),
-    EvtType.SELECT_YESNO_RESPONSE)
-  listen_event_showhide(io, hand, EvtType.SELECT_BID,
-    payload => promise_timeout(() => input_bid(payload), 1),
-    EvtType.SELECT_BID_RESPONSE)
-  listen_event_showhide(io, hand, EvtType.SELECT_CARD, async allowed_cards => {
+
+  listen_showhide(io, hand, EvtType.SELECT_YESNO, confirm, EvtType.SELECT_YESNO_RESPONSE)
+  listen_showhide(io, hand, EvtType.SELECT_BID, input_bid, EvtType.SELECT_BID_RESPONSE)
+
+  listen_showhide(io, hand, EvtType.SELECT_CARD, async allowed_cards => {
     const card = await hand.select_card(allowed_cards)
     card.remove()
     return card.dataset
   }, EvtType.SELECT_CARD_RESPONSE)
-  listen_event_showhide(io, hand, EvtType.SELECT_SUIT, async suits => {
+
+  listen_showhide(io, hand, EvtType.SELECT_SUIT, async suits => {
     deck_set_all(table, suits.map(create_ace))
     const card = await table.select_card()
     table.clear()

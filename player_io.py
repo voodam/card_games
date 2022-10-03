@@ -8,14 +8,19 @@ import random
 import json
 import re
 import util
-from simple_term_menu import TerminalMenu
+import logging
+from util_sock import send_event, listen_event
+import util_sock
 from enum import Flag, Enum, auto
-import playing_cards
+from playing_cards import Card, Suit
+from chess import ChessPiece
+from gaming import Player
 import gaming
 
 class IOMode(Flag):
   CONSOLE = auto()
   SOCKET = auto()
+  # It doesn't make sence to specify this mode, use WEBSOCKET instead
   WEBSOCKET_ONLY = auto()
   WEBSOCKET = SOCKET | WEBSOCKET_ONLY
   ALL = CONSOLE | WEBSOCKET
@@ -24,7 +29,7 @@ class IOMode(Flag):
     return self.name
 
 class EvtType(Enum):
-  # to client
+  # cards to client
   TEXT = auto()
   TRICK = auto()
   DEAL = auto()
@@ -34,12 +39,21 @@ class EvtType(Enum):
   SELECT_BID = auto()
   SELECT_CARD = auto()
   SELECT_SUIT = auto()
-  # to server
+  # cards to server
   ENTER = auto()
   SELECT_YESNO_RESPONSE = auto()
   SELECT_BID_RESPONSE = auto()
   SELECT_CARD_RESPONSE = auto()
   SELECT_SUIT_RESPONSE = auto()
+
+  # board to client
+  BOARD_PLACE = auto()
+  BOARD_REMOVE = auto()
+  SELECT_BOARD_MOVE = auto()
+  SELECT_PROMOTION = auto()
+  # board to server
+  SELECT_BOARD_MOVE_RESPONSE = auto()
+  SELECT_PROMOTION_RESPONSE = auto()
 
   def __str__(self):
     return self.name
@@ -50,6 +64,32 @@ class EvtType(Enum):
   def from_json(name):
     return EvtType[name]
 
+  def payload_from_json(self, payload):
+    """Specify here every event that have payload parts that should be deserialized to objects."""
+    card = Card.from_json
+    suit = Suit.from_json
+    player = Player.from_json
+    chess_piece = ChessPiece.from_json
+
+    if self == EvtType.SELECT_CARD_RESPONSE:
+      return card(payload)
+    elif self in [EvtType.TRUMP, EvtType.SELECT_SUIT_RESPONSE]:
+      return suit(payload)
+    elif self in [EvtType.DEAL, EvtType.SELECT_CARD]:
+      return map(card, payload)
+    elif self == EvtType.SELECT_SUIT:
+      return map(suit, payload)
+    elif self == EvtType.CARD:
+      return {
+        "card": card(payload["card"]),
+        "from": player(payload["from"])
+      }
+    elif self == EvtType.SELECT_PROMOTION:
+      return map(chess_piece, payload)
+    elif self == EvtType.SELECT_PROMOTION_RESPONSE:
+      return chess_piece(payload)
+    return payload
+
 class SocketIO:
   def __init__(self, player, conn, server, all_socket_ios, 
                after_reconnect = util.noop):
@@ -59,75 +99,66 @@ class SocketIO:
     self.all_socket_ios = all_socket_ios
     self.after_reconnect = after_reconnect
 
+  def __del__(self):
+    self.conn.close()
+
   def send_event(self, evt_type, payload = None):
     try:
-      self._do_send_event(evt_type, payload)
+      send_event(self.conn, evt_type, payload)
     except ConnectionError:
       self._reconnect()
       self.send_event(evt_type, payload)
 
-  def _do_send_event(self, evt_type, payload):
-    event = {
-      "evt_type": evt_type,
-      "payload": payload
-    }
-    bytes = str.encode(util.json_dumps(event) + "\n")
-    self.conn.sendall(bytes)
-
-  def listen_event(conn, evt_type):
-    data = conn.recv(4096)
-    if not data:
-      raise ConnectionError()
-
-    event = json.loads(data.decode())
-    assert EvtType.from_json(event["evt_type"]) == evt_type
-    return event.get("payload")
-
   def select_yesno(self, message):
     try:
-      self._do_send_event(EvtType.SELECT_YESNO, message)
-      boolean = SocketIO.listen_event(self.conn, EvtType.SELECT_YESNO_RESPONSE)
+      send_event(self.conn, EvtType.SELECT_YESNO, message)
+      boolean = listen_event(self.conn, EvtType.SELECT_YESNO_RESPONSE)
       assert isinstance(boolean, bool)
       return boolean
     except ConnectionError:
       self._reconnect()
       return self.select_yesno(message)
 
+  def _select(self, options, req_event, resp_event):
+    try:
+      send_event(self.conn, req_event, options)
+      option = listen_event(self.conn, resp_event)
+      assert option in options
+      return option
+    except ConnectionError:
+      self._reconnect()
+      return self._select(options, req_event, resp_event)
+
   def _reconnect(self):
     # We need to reconnect all disconnected players at once,
     # because frontend can have > 1 player on a screen.
     dead_ios = {}
     for io in self.all_socket_ios:
-      if not util.is_socket_alive(self.conn):
-        print(f"Player {io.player} lost connection, waiting for reconnect")
+      if not util_sock.is_socket_alive(self.conn):
+        logging.info(f"Player {io.player} lost connection, waiting for reconnect")
         io.conn.close()
         dead_ios[io.player.name] = io
 
     reconnected_ios = []
     while dead_ios:
       conn, _ = self.server.accept()
-      player_name = SocketIO.listen_event(conn, EvtType.ENTER)
+      player_name = listen_event(conn, EvtType.ENTER)
       if player_name in dead_ios:
         io = dead_ios.pop(player_name)
         io.conn = conn
         reconnected_ios.append(io)
-        print(f"Player {player_name} reconnected")
+        logging.info(f"Player {player_name} reconnected")
       else:
         conn.close()
-        print(f"Unknown player {player_name}, close connection")
+        logging.warning(f"Unknown player {player_name}, close connection")
 
     for io in reconnected_ios:
       io.after_reconnect(io)
 
-  def __del__(self):
-    self.conn.close()
-
 class ConsoleIO:
-  def __init__(self, player):
-    self.player = player
-
   def _select(self, options):
-    menu = TerminalMenu([str(o) for o in options])
+    from simple_term_menu import TerminalMenu
+    menu = TerminalMenu(str(o) for o in options)
     index = menu.show()
     if index is None: # keyboard interrupt
       sys.exit(0)
@@ -143,38 +174,22 @@ class ConsoleIO:
     if isinstance(payload, dict):
       payload = re.sub("['{},:]", "", str(payload))
     payload = str(payload)
-    payload = re.sub("[♥️♦️]", lambda m: util.colored(m.group(), util.TextColor.Red), payload)
+    payload = re.sub("[♥♦]", lambda m: util.colored(m.group(), util.TextColor.Red), payload)
     print(payload)
 
 def send_event_all(players, evt_type, payload = None):
-  for player in players:
-    player.io.send_event(evt_type, payload)
+  for p in players:
+    p.io.send_event(evt_type, payload)
 
 def send_text_all(players, text):
   send_event_all(players, EvtType.TEXT, text)
 
 class CardSocketIO(SocketIO):
   def select_card(self, cards):
-    try:
-      self._do_send_event(EvtType.SELECT_CARD, cards)
-      d = SocketIO.listen_event(self.conn, EvtType.SELECT_CARD_RESPONSE)
-      card = playing_cards.Card.from_json(d)
-      assert card in cards
-      return card
-    except ConnectionError:
-      self._reconnect()
-      return self.select_card(cards)
+    return self._select(cards, EvtType.SELECT_CARD, EvtType.SELECT_CARD_RESPONSE)
 
   def select_suit(self, suits):
-    try:
-      self._do_send_event(EvtType.SELECT_SUIT, suits)
-      d = SocketIO.listen_event(self.conn, EvtType.SELECT_SUIT_RESPONSE)
-      suit = playing_cards.Suit.from_json(d)
-      assert suit in suits
-      return suit
-    except ConnectionError:
-      self._reconnect()
-      return self.select_suit(suits)
+    return self._select(suits, EvtType.SELECT_SUIT, EvtType.SELECT_SUIT_RESPONSE)
 
   def select_bid(self, min_bid, max_bid, step, can_skip, message):
     payload = {
@@ -185,8 +200,8 @@ class CardSocketIO(SocketIO):
       "message": message
     }
     try:
-      self._do_send_event(EvtType.SELECT_BID, payload)
-      bid = SocketIO.listen_event(self.conn, EvtType.SELECT_BID_RESPONSE)
+      send_event(self.conn, EvtType.SELECT_BID, payload)
+      bid = listen_event(self.conn, EvtType.SELECT_BID_RESPONSE)
       if bid is None:
         assert can_skip
         return bid
@@ -214,6 +229,10 @@ class CardConsoleIO(ConsoleIO):
     return self._select(options)
 
 class CardRandomIO(CardConsoleIO):
+  def __init__(self, player):
+    CardConsoleIO.__init__(self)
+    self.player = player
+
   def _select(self, options):
     return random.choice(options)
 
@@ -221,44 +240,71 @@ class CardRandomIO(CardConsoleIO):
     print(f"[{self.player}, {evt_type}] ", end="" if payload else "\n")
     ConsoleIO.send_event(self, evt_type, payload)
 
-def send_deal(player):
-  player.io.send_event(EvtType.DEAL, player.cards)
+class BoardSocketIO(SocketIO):  
+  def select_move(self):
+    try:
+      send_event(self.conn, EvtType.SELECT_BOARD_MOVE)
+      return listen_event(self.conn, EvtType.SELECT_BOARD_MOVE_RESPONSE)
+    except ConnectionError:
+      self._reconnect()
+      return self.select_move()
 
-class GameType(Enum):
-  CARD = [CardSocketIO, CardConsoleIO, CardRandomIO]
+  def place(self, coords, piece):
+    self.send_event(EvtType.BOARD_PLACE, {"coords": coords, "piece": piece})
 
-def add_cli_arguments(arg_parser):
-  arg_parser.add_argument("--io-mode", type=lambda s: IOMode[s], choices=list(IOMode), default=IOMode.ALL, help="Which communication is used by players")
-  arg_parser.add_argument("--cpu-players", type=int, nargs="?", default=0, help="CPU players amount")
+  def remove(self, coords):
+    self.send_event(EvtType.BOARD_REMOVE, coords)
+
+  def select_promotion(self, piece_types):
+    return self._select(piece_types, EvtType.SELECT_PROMOTION, EvtType.SELECT_PROMOTION_RESPONSE)
+
+def add_socket_args(arg_parser):
   arg_parser.add_argument("--host", type=str, nargs="?", default="127.0.0.1", help="Server host")
-  arg_parser.add_argument("--port", type=int, nargs="?", default=8888, help="Server TCP port")
+  arg_parser.add_argument("--port", type=int, nargs="?", default=8888, help="Server TCP port")  
+
+def add_cli_args(arg_parser):
+  arg_parser.add_argument("--io-mode", type=lambda s: IOMode[s], choices=list(IOMode), default=IOMode.WEBSOCKET, help="Which communication is used by players")
+  arg_parser.add_argument("--cpu-players", type=int, nargs="?", default=0, help="CPU players amount")
+  add_socket_args(arg_parser)
   arg_parser.add_argument("--websocket-port", type=int, nargs="?", default=8080, help="Websocket port (used by websocat for TCP-WS bridge)")
   arg_parser.add_argument("--frontend-port", type=int, nargs="?", default=8000, help="HTTP server port (for static pages)")
 
+class GameType(Enum):
+  CARD = (CardSocketIO, CardConsoleIO, CardRandomIO)
+  BOARD = (BoardSocketIO, None, None)
+
 def new_players(players_number, io_mode, cpu_players, host, port, websocket_port, frontend_port, 
-                game_type = GameType.CARD, after_reconnect = util.noop, **_):
+                game_type = GameType.CARD, after_reconnect = lambda io: io.send_event(EvtType.DEAL, io.player.cards), **_):
   socket_io_cls, console_io_cls, random_io_cls = game_type.value
   players = []
   def add_player(p, io):
     p.io = io
     players.append(p)
 
+  def socket_enter():
+    try:
+      conn, _ = server.accept()
+      name = listen_event(conn, EvtType.ENTER)
+      return conn, name
+    except ConnectionError:
+      conn.close()
+      return socket_enter()
+
   for i in range(cpu_players):
     player = gaming.Player(f"CPU{i+1}")
     add_player(player, random_io_cls(player))
 
   if io_mode & IOMode.CONSOLE and len(players) < players_number:
-    print("Enter player name")
-    name = input()
+    name = input("Enter name: ")
     player = gaming.Player(name)
-    add_player(player, console_io_cls(player))
+    add_player(player, console_io_cls())
 
   if len(players) < players_number:
     if io_mode & IOMode.WEBSOCKET_ONLY:
       assert websocket_port
       assert frontend_port
-      assert not util.is_port_in_use(websocket_port), f"Port {websocket_port} in use"
-      assert not util.is_port_in_use(frontend_port), f"Port {frontend_port} in use"
+      assert not util_sock.is_port_in_use(websocket_port), f"Port {websocket_port} in use"
+      assert not util_sock.is_port_in_use(frontend_port), f"Port {frontend_port} in use"
 
       # websocat is used to up TCP-WebSocket bridge
       command = f"websocat --text ws-l:{host}:{websocket_port} tcp:{host}:{port}"
@@ -279,8 +325,7 @@ def new_players(players_number, io_mode, cpu_players, host, port, websocket_port
 
       ios = []
       while len(players) < players_number:
-        conn, _ = server.accept()
-        name = SocketIO.listen_event(conn, EvtType.ENTER)
+        conn, name = socket_enter()
         player = gaming.Player(name)
         io = socket_io_cls(player, conn, server, ios, after_reconnect)
         ios.append(io)

@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <style>
+      #board tr:nth-child(even) td:nth-child(odd), 
+      #board tr:nth-child(odd) td:nth-child(even) {background: grey}
+      #board td {position: relative}
+      #board td > div {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 12vh;
+      }
+    </style>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <div id="enter" style="position: absolute; z-index: 1"></div>
+    <table id="board" style="margin: auto; width: 100vh; height: 100vh">
+      <tr><td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td>
+          <td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td></tr>
+      <tr><td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td>
+          <td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td></tr>
+      <tr><td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td>
+          <td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td></tr>
+      <tr><td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td>
+          <td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td></tr>
+      <tr><td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td>
+          <td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td></tr>
+      <tr><td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td>
+          <td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td></tr>
+      <tr><td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td>
+          <td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td></tr>
+      <tr><td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td>
+          <td><div></div></td><td><div></div></td><td><div></div></td><td><div></div></td></tr>
+    </table>
+
+    <script src="util.js"></script>
+    <script src="common_ui.js"></script>
+    <script src="chessboard.js"></script>
+    <script>
+      const container = q("#enter")
+      const handler = enter_click_handler(container, WEBSOCKET_URL, personal_events, common_events)
+      create_enter_buttons(container, handler)
+    </script>
+  </body>
+</html>
+

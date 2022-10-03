@@ -1,5 +1,5 @@
 import random
-from playing_cards import Rank, Suit, get_card as c
+from playing_cards import Rank, Suit, c
 import playing_cards
 from card_game import CardGame
 import card_game
@@ -15,7 +15,7 @@ trump_points = {
 class Thousand(CardGame):
   def __init__(self):
     CardGame.__init__(self, playing_cards.deck_from(Rank.Nine),
-                      players_number=3, widdle_amount = 3)
+                      players_number=3)
     self.min_bid = 100
     self.bid_step = 5
 
@@ -33,19 +33,22 @@ class Thousand(CardGame):
   def max_bid(self, player):
     return 120 + sum(trump_points[suit] for suit in self.allowed_trumps(player))
 
-  def hand_can_be_rejected(self, hand, is_first_player = False):
-    nine_enough = 3 if is_first_player else 4
-    return len([c for c in hand if c.rank == Rank.Nine]) >= nine_enough \
-           or len([c for c in hand if c.rank == Rank.Jack]) >= 4 \
-           or sum(self.card_points(c) for c in hand) < 13
-
-  def widdle_can_be_rejected(self, widdle):
-    return len([c for c in widdle if c.rank == Rank.Nine]) >= 2 \
-           or len([c for c in widdle if c.rank == Rank.Jack]) >= 3 \
-           or sum(self.card_points(c) for c in widdle) < 5
+  def card_points(self, card):
+    return card_game.ace_ten_king_points.get(card.rank, 0)
 
 def player_can_double_score(players):
   return players[0].score > 0 and not [p for p in players if p.on_barrel]
+
+def hand_can_be_rejected(game, hand, is_first_player = False):
+  nine_enough = 3 if is_first_player else 4
+  return len([c for c in hand if c.rank == Rank.Nine]) >= nine_enough \
+         or len([c for c in hand if c.rank == Rank.Jack]) >= 4 \
+         or sum(game.card_points(c) for c in hand) < 13
+
+def widdle_can_be_rejected(game, widdle):
+  return len([c for c in widdle if c.rank == Rank.Nine]) >= 2 \
+         or len([c for c in widdle if c.rank == Rank.Jack]) >= 3 \
+         or sum(game.card_points(c) for c in widdle) < 5
 
 def shuffle(deck):
   random.shuffle(deck)

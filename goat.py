@@ -1,38 +1,38 @@
-from playing_cards import Rank, Suit
+from playing_cards import Rank, Suit, c, card as p_card
 import playing_cards
 import card_game
 from card_game import CardGame
-
-teams_number = 2
 
 class Goat(CardGame):
   def __init__(self):
     CardGame.__init__(self, playing_cards.deck_from(Rank.Seven),
                       players_number=4)
     
-  def card_hit_value(self, card, trick_cards, trump):
-    if card == playing_cards.get_card(Rank.Seven, trump):
-      return 100
-    elif card == playing_cards.get("♣J"):
-      return 99
-    elif card == playing_cards.get("♠J"):
-      return 98
-    elif card == playing_cards.get("♥J"):
-      return 97
-    elif card == playing_cards.get("♦J"):
-      return 96
-    else:
-      return CardGame.card_hit_value(self, card, trick_cards, trump)
+  def card_hit_value(self, card, trump, trick_cards = None):
+    return {
+      c(Rank.Seven, trump): 100,
+      p_card("♣J"): 99,
+      p_card("♠J"): 98,
+      p_card("♥J"): 97,
+      p_card("♦J"): 96,
+    }.get(card) or \
+    CardGame.card_hit_value(self, card, trump, trick_cards)
 
   def eq_suits(self, card1, card2, trump):
-    def is_trump(c):
-      return True if c.rank == Rank.Jack else c.suit == trump
+    is_trump1 = self.is_trump(card1, trump)
+    is_trump2 = self.is_trump(card2, trump)
 
-    if is_trump(card1):
-      return is_trump(card2)
-    if is_trump(card2):
-      return is_trump(card1)
+    if is_trump1:
+      return is_trump2
+    if is_trump2:
+      return is_trump1
     return CardGame.eq_suits(self, card1, card2, trump)
+  
+  def is_trump(self, card, trump):
+    return True if card.rank == Rank.Jack else card.suit == trump
+
+  def card_points(self, card):
+    return card_game.ace_ten_king_points.get(card.rank, 0)
 
 def calc_score(attacking_team, defending_team):
   assert attacking_team.points + defending_team.points == 120

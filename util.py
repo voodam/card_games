@@ -1,15 +1,44 @@
-import fcntl
-import os
 import json
-import socket
-import errno
-from enum import Enum
+from contextlib import ExitStack
+from enum import Enum, auto
 
 def noop(*_, **__):
   pass
 
 def id(v):
   return v
+
+class Just:
+  def __init__(self, v):
+    self.v = v
+
+  def map(self, f):
+    return Just(f(self.v))
+
+  def get(self):
+    return self.v
+
+  def __bool__(self):
+    return bool(self.v)
+
+class NothingCls:
+  def map(self, f):
+    return Nothing
+
+  def get(self):
+    return None
+
+  def __bool__(self):
+    return False
+
+Nothing = NothingCls()
+
+def maybe(v):
+  return Just(v) if v is not None else Nothing
+
+class Color(Enum):
+  Black = auto()
+  White = auto()
 
 class TextColor(Enum):
   Black = 30
@@ -42,9 +71,12 @@ def colored(text, color, style = TextStyle.Nothing):
   return f"\33[{style};{color}m{text}\33[m"
 
 def make_list(v):
-  if not isinstance(v, list):
-    v = [v]
+  if not isinstance(v, list): v = [v]
   return v
+
+def list_get(l, idx, default = None):
+  try: return l[idx]
+  except IndexError: return default
 
 def list_rotate(l, start_element):
   i = l.index(start_element)
@@ -52,13 +84,22 @@ def list_rotate(l, start_element):
 
 def list_chunks(l, chunks_number):
   length = len(l)
-  assert length % chunks_number == 0
+  assert length % chunks_number == 0, f"{length} % {chunks_number} != 0"
   chunk_size = length // chunks_number
   return [l[i:i + chunk_size] for i in range(0, length, chunk_size)]
+
+def list_remove_if_exist(l, v):
+  if v in l: l.remove(v)
 
 def opposite_in_pair(pair, obj):
   assert len(pair) == 2
   return pair[1] if pair[0] == obj else pair[0]
+
+def dict_merge(*dicts):
+  res = {}
+  for d in dicts:
+    res.update(d)
+  return res
 
 def json_dumps(obj):
   def f(v):
@@ -68,31 +109,4 @@ def json_dumps(obj):
       return v.to_json()
 
   return json.dumps(obj, default=f)
-
-def is_port_in_use(port):
-  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    return s.connect_ex(("localhost", port)) == 0
-
-def is_socket_alive(conn):
-  if conn.fileno() < 0:
-    return False
-
-  flags = fcntl.fcntl(conn, fcntl.F_GETFL)
-  is_blocking = flags & os.O_NONBLOCK
-  if is_blocking:
-    conn.setblocking(False)
-
-  try:
-    data = conn.recv(1024)
-    if not data:
-      return False
-  except socket.error as e:
-    code = e.args[0]
-    if code == errno.EAGAIN or code == errno.EWOULDBLOCK:
-      return True
-    else:
-      raise e
-  finally:
-    if is_blocking:
-      conn.setblocking(True)
 

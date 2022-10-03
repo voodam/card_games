@@ -6,10 +6,20 @@ if (under_node_js) {
   })()
 }
 
+const id = v => v
+const noop = () => {}
+
+const array_equals = (a, b) =>
+  a.length === b.length &&
+  a.every((v, i) => v === b[i])
+
 class SimpleWebsocket {
+  static HANDLE_ONCE = "__once__"
+
   constructor(url = "ws://localhost:8080") {
     this.socket = new WebSocket(url)
     this.handlers = {}
+    this.once_handlers = []
     this.socket.addEventListener("message", async ({data}) => {
       for (const json of data.trim().split("\n")) {
         const {evt_type, payload} = JSON.parse(json)
@@ -17,22 +27,36 @@ class SimpleWebsocket {
         console.log(payload)
         if (evt_type in this.handlers)
           this.handlers[evt_type](payload)
+
+        for (const cb of this.once_handlers)
+          cb(payload)
+        this.once_handlers = []
       }
     })
   }
 
-  send_event(evt_type, payload = null) {
-    if (this.socket.readyState == WebSocket.OPEN) {
+  send(evt_type, payload = null) {
+    if (this.socket.readyState === WebSocket.OPEN) {
       const json = JSON.stringify({evt_type, payload})
       this.socket.send(json)
     } else {
-      this.socket.addEventListener("open", () => this.send_event(evt_type, payload))
+      this.socket.addEventListener("open", () => this.send(evt_type, payload))
     }
   }
 
-  listen_event(evt_type, handler) {
-    this.handlers[evt_type] = handler
+  listen(evt_type, handler) {
+    if (evt_type === SimpleWebsocket.HANDLE_ONCE)
+      this.once_handlers.push(handler)
+    else
+      this.handlers[evt_type] = handler
   }
+}
+
+const ws_listen_send = (io, req_event, cb, resp_event) => {
+  io.listen(req_event, async payload => {
+    const res = await cb(payload)
+    io.send(resp_event, res)
+  })
 }
 
 const listen_once = (element, event_name, callback) => {

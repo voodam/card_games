@@ -16,19 +16,12 @@
     <div id="trump" style="position: absolute; top: 0px; right: 0px; width: 10%"></div>
 
     <script src="util.js"></script>
-    <script src="frontend.js"></script>
+    <script src="common_ui.js"></script>
+    <script src="cards.js"></script>
     <script>
-      const create_button = player => {
-        const input = document.createElement("input")
-        input.type = "button"
-        input.value = player
-        input.style = "font-size: 70px"
-        input.onclick = ({target}) => enter(target)
-        return input
-      }
-      const players = params.getAll("player")
-      for (const p of players)
-        q("#enter").appendChild(create_button(p))
+      const container = q("#enter")
+      const handler = enter_click_handler(container, WEBSOCKET_URL, personal_events, common_events)
+      create_enter_buttons(container, handler)
     </script>
   </body>
 </html>
