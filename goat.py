@@ -1,57 +1,53 @@
-from playing_cards import Rank, Suit, c, card as p_card
-import playing_cards
-import card_game
-from card_game import CardGame
+from argparse import ArgumentParser
+import random
+import itertools
 
-class Goat(CardGame):
-  def __init__(self):
-    CardGame.__init__(self, playing_cards.deck_from(Rank.Seven),
-                      players_number=4)
-    
-  def card_hit_value(self, card, trump, trick_cards = None):
-    return {
-      c(Rank.Seven, trump): 100,
-      p_card("♣J"): 99,
-      p_card("♠J"): 98,
-      p_card("♥J"): 97,
-      p_card("♦J"): 96,
-    }.get(card) or \
-    CardGame.card_hit_value(self, card, trump, trick_cards)
+from lib.util import opposite_in_pair
+from logic.io import EvtType, send_event_all, send_text_all
+import logic.io
+import logic.io.trick_taking as trick_taking
+from logic.io.util import deal
+from logic.cards import Rank, Suit, card
+import logic.game
+from logic.game.goat import *
 
-  def eq_suits(self, card1, card2, trump):
-    is_trump1 = self.is_trump(card1, trump)
-    is_trump2 = self.is_trump(card2, trump)
+parser = ArgumentParser(description="Kozel card game")
+logic.io.add_cli_args(parser)
+logic.game.add_team_args(parser)
+args = parser.parse_args()
 
-    if is_trump1:
-      return is_trump2
-    if is_trump2:
-      return is_trump1
-    return CardGame.eq_suits(self, card1, card2, trump)
-  
-  def is_trump(self, card, trump):
-    return True if card.rank == Rank.Jack else card.suit == trump
+goat = Goat()
+players = logic.io.new_players(goat.players_number, **vars(args))
+teams = logic.game.assign_to_teams(players, teams_number=2, team_scores=args.team_scores)
+team1, team2 = teams
+parties_cycle = itertools.cycle(players.copy())
 
-  def card_points(self, card):
-    return card_game.ace_ten_king_points.get(card.rank, 0)
+logic.game.player_starts(players, random.choice(players))
+send_text_all(players, f"{team1} против {team2}")
 
-def calc_score(attacking_team, defending_team):
-  assert attacking_team.points + defending_team.points == 120
+while True:
+  winner = None
+  while not winner:
+    logic.game.player_starts(players, next(parties_cycle))
 
-  if attacking_team.points < 30:
-    return defending_team, 4
-  elif attacking_team.points < 60:
-    return defending_team, 2
-  elif attacking_team.points == 60:
-    return defending_team, 0
-  elif attacking_team.points <= 90:
-    return attacking_team, 1
-  elif attacking_team.points < 120:
-    return attacking_team, 2
-  else:
-    return attacking_team, 4
+    random.shuffle(goat.deck)
+    deal(players, goat)
 
-def get_winner(teams):
-  winners = [team for team in teams if team.score >= 12]
-  assert len(winners) <= 1
-  return winners[0] if winners else None
+    clubs_jack_owner = card("♣J").player
+    send_text_all(players, f"{clubs_jack_owner} выбирает козырь")
+    trump = clubs_jack_owner.io.select_suit(list(Suit))
+    send_event_all(players, EvtType.TRUMP, trump)
+
+    trick_taking.party(players, goat, trump=trump)
+
+    defending_team = opposite_in_pair(teams, clubs_jack_owner.team)
+    team, score = calc_score(clubs_jack_owner.team, defending_team)
+    team.score += score
+    send_text_all(players, f"{team} набрали {score} очков ({team.points})! Счет: {team1.score}-{team2.score}")
+    winner = get_winner(teams)
+
+  send_text_all(players, f"{winner} победили ({winner.score} очков)!")
+  loser = opposite_in_pair(teams, winner)
+  winner.score -= 12
+  loser.score = 0
 

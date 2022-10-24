@@ -1,18 +1,19 @@
 import socket
 import argparse
-from player_io import EvtType
-import player_io
-from util_sock import send_event, listen_events
+
+from lib.socket import send_event, listen_events
+from logic.io import EvtType
+import logic.io
 
 parser = argparse.ArgumentParser(description="Socket client")
-player_io.add_socket_args(parser)
+logic.io.add_socket_args(parser)
 args = parser.parse_args()
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
   s.connect((args.host, args.port))
   name = input("Enter name: ")
   send_event(s, EvtType.ENTER, name)
-  io = player_io.CardConsoleIO()
+  io = logic.io.CardConsoleIO()
 
   while True:
     for evt_type, payload in listen_events(s, list(EvtType)):
@@ -30,4 +31,3 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         send_event(s, EvtType.SELECT_SUIT_RESPONSE, suit)
       else:
         io.send_event(evt_type, payload)
-

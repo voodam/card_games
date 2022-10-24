@@ -1,6 +1,7 @@
 from enum import Enum
 from functools import total_ordering
-import util
+
+import lib.list
 
 @total_ordering
 class Rank(Enum):
@@ -76,14 +77,14 @@ def deal(players, deck, hand_amount = None):
 
   widdle = deck[hand_amount*players_number:]
   deck = deck[:hand_amount*players_number]
-  hands = util.list_chunks(deck, players_number)
+  hands = lib.list.chunks(deck, players_number)
 
   for player, hand in zip(players, hands):
     attach_to_player(hand, player)
   return widdle
 
 def attach_to_player(cards, player):
-  cards = util.make_list(cards)
+  cards = lib.list.make(cards)
   if not hasattr(player, "cards"):
     player.cards = []
 
@@ -92,7 +93,7 @@ def attach_to_player(cards, player):
     card.player = player
 
 def detach_from_player(cards):
-  cards = util.make_list(cards)
+  cards = lib.list.make(cards)
   for c in cards:
     if getattr(c, "player", None):
       c.player.cards.remove(c)

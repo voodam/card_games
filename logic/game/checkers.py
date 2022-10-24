@@ -1,4 +1,4 @@
-from board_game import BlackWhitePieceType
+from logic.board import BlackWhitePieceType
 
 class CheckersPiece(BlackWhitePieceType):
   Man = ("⛂", "⛀")
@@ -10,12 +10,12 @@ class Checkers:
 
   def setup_board(self):
     for x in range(0, 8, 2):
-      for y in [0, 2]:
+      for y in (0, 2):
         self.board.place([x, y], Piece(CheckersPiece.Man, Color.Black))
       self.board.place([x, 6], Piece(CheckersPiece.Man, Color.White))
 
     for x in range(1, 8, 2):
-      for y in [5, 7]:
+      for y in (5, 7):
         self.board.place([x, y], Piece(CheckersPiece.Man, Color.White))
       self.board.place([x, 1], Piece(CheckersPiece.Man, Color.Black))
 

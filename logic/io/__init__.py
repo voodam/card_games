@@ -7,15 +7,16 @@ from subprocess import DEVNULL
 import random
 import json
 import re
-import util
 import logging
-from util_sock import send_event, listen_event
-import util_sock
 from enum import Flag, Enum, auto
-from playing_cards import Card, Suit
-from chess import ChessPiece
-from gaming import Player
-import gaming
+
+from lib.util import colored, TextColor
+from lib.fp import noop
+from lib.socket import send_event, listen_event
+import lib.socket
+from logic.game import Player
+from logic.cards import Card, Suit
+from logic.game.chess import ChessPiece
 
 class IOMode(Flag):
   CONSOLE = auto()
@@ -73,9 +74,9 @@ class EvtType(Enum):
 
     if self == EvtType.SELECT_CARD_RESPONSE:
       return card(payload)
-    elif self in [EvtType.TRUMP, EvtType.SELECT_SUIT_RESPONSE]:
+    elif self in (EvtType.TRUMP, EvtType.SELECT_SUIT_RESPONSE):
       return suit(payload)
-    elif self in [EvtType.DEAL, EvtType.SELECT_CARD]:
+    elif self in (EvtType.DEAL, EvtType.SELECT_CARD):
       return map(card, payload)
     elif self == EvtType.SELECT_SUIT:
       return map(suit, payload)
@@ -92,7 +93,7 @@ class EvtType(Enum):
 
 class SocketIO:
   def __init__(self, player, conn, server, all_socket_ios, 
-               after_reconnect = util.noop):
+               after_reconnect = noop):
     self.player = player
     self.conn = conn
     self.server = server
@@ -134,7 +135,7 @@ class SocketIO:
     # because frontend can have > 1 player on a screen.
     dead_ios = {}
     for io in self.all_socket_ios:
-      if not util_sock.is_socket_alive(self.conn):
+      if not lib.socket.is_socket_alive(self.conn):
         logging.info(f"Player {io.player} lost connection, waiting for reconnect")
         io.conn.close()
         dead_ios[io.player.name] = io
@@ -174,7 +175,7 @@ class ConsoleIO:
     if isinstance(payload, dict):
       payload = re.sub("['{},:]", "", str(payload))
     payload = str(payload)
-    payload = re.sub("[♥♦]", lambda m: util.colored(m.group(), util.TextColor.Red), payload)
+    payload = re.sub("[♥♦]", lambda m: colored(m.group(), TextColor.Red), payload)
     print(payload)
 
 def send_event_all(players, evt_type, payload = None):
@@ -291,20 +292,20 @@ def new_players(players_number, io_mode, cpu_players, host, port, websocket_port
       return socket_enter()
 
   for i in range(cpu_players):
-    player = gaming.Player(f"CPU{i+1}")
+    player = Player(f"CPU{i+1}")
     add_player(player, random_io_cls(player))
 
   if io_mode & IOMode.CONSOLE and len(players) < players_number:
     name = input("Enter name: ")
-    player = gaming.Player(name)
+    player = Player(name)
     add_player(player, console_io_cls())
 
   if len(players) < players_number:
     if io_mode & IOMode.WEBSOCKET_ONLY:
       assert websocket_port
       assert frontend_port
-      assert not util_sock.is_port_in_use(websocket_port), f"Port {websocket_port} in use"
-      assert not util_sock.is_port_in_use(frontend_port), f"Port {frontend_port} in use"
+      assert not lib.socket.is_port_in_use(websocket_port), f"Port {websocket_port} in use"
+      assert not lib.socket.is_port_in_use(frontend_port), f"Port {frontend_port} in use"
 
       # websocat is used to up TCP-WebSocket bridge
       command = f"websocat --text ws-l:{host}:{websocket_port} tcp:{host}:{port}"
@@ -326,7 +327,7 @@ def new_players(players_number, io_mode, cpu_players, host, port, websocket_port
       ios = []
       while len(players) < players_number:
         conn, name = socket_enter()
-        player = gaming.Player(name)
+        player = Player(name)
         io = socket_io_cls(player, conn, server, ios, after_reconnect)
         ios.append(io)
         add_player(player, io)

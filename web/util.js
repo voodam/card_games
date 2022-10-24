@@ -9,6 +9,14 @@ if (under_node_js) {
 const id = v => v
 const noop = () => {}
 
+const skip_first = (cb, label) => {
+  if (skip_first.labels.has(label))
+    cb()
+  else
+    skip_first.labels.add(label)
+}
+skip_first.labels = new Set()
+
 const array_equals = (a, b) =>
   a.length === b.length &&
   a.every((v, i) => v === b[i])

@@ -2,56 +2,57 @@ import shlex
 import subprocess
 import time
 import argparse
-from playing_cards import Rank, Suit, card
-import playing_cards
-import card_game
-import gaming
-import goat
-import thousand as t
-import fool as f
-import board_game
-from board_game import SegType
+
+import logic.game
+from logic.cards import Rank, Suit, card
+import logic.cards
+from logic.cardgame import hitting_card
+from logic.board import SegType
+import logic.board
+from logic.game.goat import Goat
+import logic.game.thousand as t
+import logic.game.fool as f
 
 parser = argparse.ArgumentParser(description="Unit and integration tests")
 parser.add_argument("--no-integration", dest="integration", action="store_false", help="Team start scores")
 args = parser.parse_args()
 
-p1 = gaming.Player("")
-p2 = gaming.Player("")
-p3 = gaming.Player("")
-p4 = gaming.Player("")
+p1 = logic.game.Player("")
+p2 = logic.game.Player("")
+p3 = logic.game.Player("")
+p4 = logic.game.Player("")
 # тысяча
-widdle = playing_cards.deal([p1, p2, p3], playing_cards.deck_from(Rank.Nine), 7)
+widdle = logic.cards.deal([p1, p2, p3], logic.cards.deck_from(Rank.Nine), 7)
 assert len(widdle) == 3
-for p in [p1, p2, p3]:
+for p in (p1, p2, p3):
   assert len(p.cards) == 7
 # козел
-assert not playing_cards.deal([p1, p2, p3, p4], playing_cards.deck_from(Rank.Seven))
-for p in [p1, p2, p3, p4]:
+assert not logic.cards.deal([p1, p2, p3, p4], logic.cards.deck_from(Rank.Seven))
+for p in (p1, p2, p3, p4):
   assert len(p.cards) == 8
 # дурак
-deck = playing_cards.deal([p1, p2, p3], playing_cards.deck_from(Rank.Six), 6)
+deck = logic.cards.deal([p1, p2, p3], logic.cards.deck_from(Rank.Six), 6)
 assert len(deck) == 36 - 3*6
-for p in [p1, p2, p3]:
+for p in (p1, p2, p3):
   assert len(p.cards) == 6
 
-goat = goat.Goat()
+goat = Goat()
 # туз другой масти не бьет
-assert card_game.hitting_card(goat, [card("♦K"), card("♠A")], Suit("♣")) == card("♦K")
+assert hitting_card(goat, [card("♦K"), card("♠A")], Suit("♣")) == card("♦K")
 # туз козырь бьет другую масть
-assert card_game.hitting_card(goat, [card("♦K"), card("♠A")], Suit("♠")) == card("♠A")
+assert hitting_card(goat, [card("♦K"), card("♠A")], Suit("♠")) == card("♠A")
 # десятка бьет короля
-assert card_game.hitting_card(goat, [card("♦K"), card("♦10")], Suit("♣")) == card("♦10")
+assert hitting_card(goat, [card("♦K"), card("♦10")], Suit("♣")) == card("♦10")
 # семерка козырь бъет валет
-assert card_game.hitting_card(goat, [card("♦7"), card("♣J")], Suit("♦")) == card("♦7")
+assert hitting_card(goat, [card("♦7"), card("♣J")], Suit("♦")) == card("♦7")
 # туз не бьет валет той же масти
-assert card_game.hitting_card(goat, [card("♦J"), card("♦A")], Suit("♦")) == card("♦J")
-assert card_game.hitting_card(goat, [card("♦J"), card("♦A")], Suit("♠")) == card("♦J")
+assert hitting_card(goat, [card("♦J"), card("♦A")], Suit("♦")) == card("♦J")
+assert hitting_card(goat, [card("♦J"), card("♦A")], Suit("♠")) == card("♦J")
 # валет бьет туз той же масти
-assert card_game.hitting_card(goat, [card("♦A"), card("♦J")], Suit("♦")) == card("♦J")
-assert card_game.hitting_card(goat, [card("♦A"), card("♦J")], Suit("♠")) == card("♦J")
+assert hitting_card(goat, [card("♦A"), card("♦J")], Suit("♦")) == card("♦J")
+assert hitting_card(goat, [card("♦A"), card("♦J")], Suit("♠")) == card("♦J")
 # восемь бьет семь
-assert card_game.hitting_card(goat, [card("♦7"), card("♦8")], Suit("♠")) == card("♦8")
+assert hitting_card(goat, [card("♦7"), card("♦8")], Suit("♠")) == card("♦8")
 
 player_cards = [card("♥8"), card("♠10")]
 # первая положенная карта может быть любой
@@ -74,7 +75,7 @@ assert goat.allowed_cards(player_cards, [card("♠K")], Suit("♦")) == [card("�
 assert goat.allowed_cards(player_cards, [card("♠K")], Suit("♠")) == player_cards
 
 thousand = t.Thousand()
-p = gaming.Player("")
+p = logic.game.Player("")
 t.init_player(p)
 p.cards = [card("♥K"), card("♥Q"), card("♦K"), card("♦Q"), card("♣K"), card("♣Q"), card("♠K"), card("♠Q")]
 assert thousand.allowed_trumps(p) == set()
@@ -158,9 +159,9 @@ p.selected_trumps = set([Suit.Hearts])
 assert t.calc_score(p) == (105, 0)
 assert p.score == 245
 
-p1 = gaming.Player("")
-p2 = gaming.Player("")
-p3 = gaming.Player("")
+p1 = logic.game.Player("")
+p2 = logic.game.Player("")
+p3 = logic.game.Player("")
 t.init_player(p1)
 t.init_player(p2)
 t.init_player(p3)
@@ -226,7 +227,7 @@ assert p1.score == 760
 assert p1.barrel_parties == 0
 
 fool = f.Fool(players_number=2)
-p = gaming.Player("")
+p = logic.game.Player("")
 
 p.cards = [card("♥K"), card("♥Q"), card("♦K"), card("♦Q"), card("♥8"), card("♠J")]
 cards = f.TrickCards({card("♣Q"): card("♣K"), card("♣J"): None})
@@ -265,7 +266,7 @@ except AssertionError as e:
   assert str(e) == "No cards to beat available"
 
 cards = [card("♦6"), card("♥6"), card("♠6"), card("♣6"), card("♠7"), card("♣7")]
-deck = playing_cards.deck_from(Rank.Eight)
+deck = logic.cards.deck_from(Rank.Eight)
 new_cards = f.replenish_cards(cards, deck)
 assert len(new_cards) == 0
 assert len(deck) == 28
@@ -295,29 +296,30 @@ new_cards = f.replenish_cards(cards, deck)
 assert len(new_cards) == 0
 assert len(deck) == 0
 
-assert board_game.get_segment_coords([5, 0], [0, 0]) == ([[1, 0], [2, 0], [3, 0], [4, 0]], SegType.LINE)
-assert board_game.get_segment_coords([3, 5], [5, 5]) == ([[4, 5]], SegType.LINE)
-assert board_game.get_segment_coords([2, 6], [2, 2]) == ([[2, 3], [2, 4], [2, 5]], SegType.LINE)
-assert board_game.get_segment_coords([6, 7], [6, 4]) == ([[6, 5], [6, 6]], SegType.LINE)
-assert board_game.get_segment_coords([4, 4], [8, 8]) == ([[5, 5], [6, 6], [7, 7]], SegType.DIAG)
-assert board_game.get_segment_coords([8, 4], [5, 1]) == ([[6, 2], [7, 3]], SegType.DIAG)
-assert board_game.get_segment_coords([3, 7], [6, 4]) == ([[4, 6], [5, 5]], SegType.DIAG)
-assert board_game.get_segment_coords([6, 7], [6, 7]) == ([], SegType.LINE)
-assert board_game.get_segment_coords([6, 7], [6, 8]) == ([], SegType.LINE)
-assert board_game.get_segment_coords([6, 7], [4, 4]) == ([], SegType.NOT_SEGMENT)
+assert logic.board.get_segment_coords([5, 0], [0, 0]) == ([[1, 0], [2, 0], [3, 0], [4, 0]], SegType.LINE)
+assert logic.board.get_segment_coords([3, 5], [5, 5]) == ([[4, 5]], SegType.LINE)
+assert logic.board.get_segment_coords([2, 6], [2, 2]) == ([[2, 3], [2, 4], [2, 5]], SegType.LINE)
+assert logic.board.get_segment_coords([6, 7], [6, 4]) == ([[6, 5], [6, 6]], SegType.LINE)
+assert logic.board.get_segment_coords([4, 4], [8, 8]) == ([[5, 5], [6, 6], [7, 7]], SegType.DIAG)
+assert logic.board.get_segment_coords([8, 4], [5, 1]) == ([[6, 2], [7, 3]], SegType.DIAG)
+assert logic.board.get_segment_coords([3, 7], [6, 4]) == ([[4, 6], [5, 5]], SegType.DIAG)
+assert logic.board.get_segment_coords([6, 7], [6, 7]) == ([], SegType.LINE)
+assert logic.board.get_segment_coords([6, 7], [6, 8]) == ([], SegType.LINE)
+assert logic.board.get_segment_coords([6, 7], [4, 4]) == ([], SegType.NOT_SEGMENT)
 
 if args.integration:
-  command = f"python3 goat_main.py --cpu-players={goat.players_number}"
-  server = subprocess.Popen(shlex.split(command), stdout=subprocess.DEVNULL)
-  time.sleep(5)
-  server.kill()
+  games = {
+    "goat": (goat.players_number, 5),
+    "thousand": (thousand.players_number, 10),
+  }
 
-  command = f"python3 thousand_main.py --cpu-players={thousand.players_number}"
-  server = subprocess.Popen(shlex.split(command), stdout=subprocess.DEVNULL)
-  time.sleep(10)
-  server.kill()
+  for game, (players_number, test_duration) in games.items():
+    command = f"python3 {game}.py --cpu-players={players_number}"
+    server = subprocess.Popen(shlex.split(command), stdout=subprocess.DEVNULL)
+    time.sleep(test_duration)
+    server.kill()
 
-  command = f"python3 fool_main.py --cpu-players=5 --total-players=5"
+  command = "python3 fool.py --cpu-players=5 --total-players=5"
   server = subprocess.Popen(shlex.split(command), stdout=subprocess.DEVNULL)
   time.sleep(10)
   server.kill()

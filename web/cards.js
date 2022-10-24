@@ -48,7 +48,7 @@ class Deck {
       this.delay = false
       this.clear()
       for (const cb of this.after_delay)
-        
+        cb()
       this.after_delay = []
     }, delay_ms)
   }
@@ -148,7 +148,8 @@ class MessageBox {
 const listen_showhide = (io, hand, req_event, cb, resp_event) =>
   ws_listen_send(io, req_event, async payload => {
     await show_hand(hand)
-    // i don't know why timeout is required to hand can be shown
+    // Async JS works bad with blocking standart popups (confirm and prompt functions),
+    // timeout mostly solves this problem.
     const res = await promise_timeout(() => cb(payload), 100)
     hide_hand(hand)
     return res

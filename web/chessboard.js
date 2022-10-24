@@ -31,9 +31,9 @@ class Board {
   async select_move() {
     const get_cell = target => {
       if (target.tagName == "TD") target = target.firstChild
-      if (target.tagName !== "DIV") target = null
-      return target
-    } 
+      if (target.tagName === "DIV") return target
+      return null
+    }
 
     const from = await listen_once(this.container, "click", ({target}) => {
       const cell = get_cell(target)

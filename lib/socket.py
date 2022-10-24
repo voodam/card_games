@@ -3,7 +3,9 @@ import os
 import socket
 import errno
 import json
-import util
+
+import lib.util as util
+from lib.fp import id
 
 def is_port_in_use(port):
   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -24,7 +26,7 @@ def is_socket_alive(conn):
       return False
   except socket.error as e:
     code = e.args[0]
-    if code in [errno.EAGAIN, errno.EWOULDBLOCK]:
+    if code in (errno.EAGAIN, errno.EWOULDBLOCK):
       return True
     else:
       raise e
@@ -42,13 +44,13 @@ def send_event(conn, evt_type, payload = None):
 
 def listen_events(conn, evt_types):
   assert len(evt_types) >= 1
-  evt_from_json = getattr(evt_types[0].__class__, "from_json", util.id)
+  evt_from_json = getattr(evt_types[0].__class__, "from_json", id)
 
   def result(j):
     event = json.loads(j)
     evt_type = evt_from_json(event["evt_type"])
     assert evt_type in evt_types
-    payload_from_json = getattr(evt_type, "payload_from_json", util.id)
+    payload_from_json = getattr(evt_type, "payload_from_json", id)
     payload = payload_from_json(event.get("payload"))
     return evt_type, payload
 

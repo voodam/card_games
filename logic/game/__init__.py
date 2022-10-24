@@ -1,8 +1,9 @@
 from enum import Enum, auto
 import itertools
-import util
 
-player_starts = util.list_rotate
+import lib.list
+
+player_starts = lib.list.rotate
 
 class Player:
   def __init__(self, name):

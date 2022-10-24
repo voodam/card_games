@@ -1,9 +1,9 @@
 from enum import Enum, auto
 from itertools import chain
-from util import Color
-import util
 import contextlib
 import math
+
+from lib.util import Color, opposite_in_pair
 
 class Board2D:
   def __init__(self, x_size = 8, y_size = 8, group_pieces_by = lambda p: p.color):
@@ -52,15 +52,6 @@ def move(board, from_, to, virtual = False):
   piece = board.remove(from_, virtual)
   board.place(to, piece, virtual)
 
-@contextlib.contextmanager
-def move_virtually(board, from_, to):
-  piece = remove_if_placed(board, to, virtual=True)
-  move(board, from_, to, virtual=True)
-  yield
-  move(board, to, from_, virtual=True)
-  if piece:
-    board.place(to, piece, virtual=True)
-
 def replace(board, coords, piece, virtual = False):
   board.remove(coords, virtual)
   board.place(coords, piece, virtual)
@@ -72,6 +63,15 @@ def remove_if_placed(board, coords, virtual = False):
 
 def get_pieces_all(board):
   return chain.from_iterable(board.get_pieces_grouped().values())
+
+@contextlib.contextmanager
+def move_virtually(board, from_, to):
+  piece = remove_if_placed(board, to, virtual=True)
+  move(board, from_, to, virtual=True)
+  yield
+  move(board, to, from_, virtual=True)
+  if piece:
+    board.place(to, piece, virtual=True)
 
 class SegType(Enum):
   LINE = auto()
@@ -136,5 +136,5 @@ def is_valid_move(game, piece, to, color):
   return piece and piece.color == color and game.is_valid_move(piece, to)
 
 def bw_enemy(color):
-  return util.opposite_in_pair((Color.Black, Color.White), color)
+  return opposite_in_pair((Color.Black, Color.White), color)
 
