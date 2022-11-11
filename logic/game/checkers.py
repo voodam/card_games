@@ -1,4 +1,4 @@
-from logic.board import BlackWhitePieceType
+from logic.field import BlackWhitePieceType
 
 class CheckersPiece(BlackWhitePieceType):
   Man = ("⛂", "⛀")

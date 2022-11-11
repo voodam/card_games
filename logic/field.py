@@ -5,42 +5,42 @@ import math
 
 from lib.util import Color, opposite_in_pair
 
-class Board2D:
-  def __init__(self, x_size = 8, y_size = 8, group_pieces_by = lambda p: p.color):
+class Field2D:
+  def __init__(self, x_size = 8, y_size = 8, group_units_by = lambda p: p.color):
     self.x_size = x_size
     self.y_size = y_size
     self.underlying = [[None] * y_size for _ in range(x_size)]
-    self.group_pieces_by = group_pieces_by
-    self.pieces = {}
+    self.group_units_by = group_units_by
+    self.units = {}
 
-  def place(self, coords, piece, virtual = False):
+  def place(self, coords, unit, virtual = False):
     x, y = self._get_coords(coords)
     assert self.underlying[x][y] is None, coords
-    assert not getattr(piece, "coords", None)
+    assert not getattr(unit, "coords", None)
 
-    self.underlying[x][y] = piece
-    piece.coords = coords
-    group = self.group_pieces_by(piece)
-    self.pieces.setdefault(group, []).append(piece)
+    self.underlying[x][y] = unit
+    unit.coords = coords
+    group = self.group_units_by(unit)
+    self.units.setdefault(group, []).append(unit)
 
   def remove(self, coords, virtual = False):
     x, y = self._get_coords(coords)
-    piece = self.underlying[x][y]
-    assert piece, coords
-    assert piece.coords, piece
+    unit = self.underlying[x][y]
+    assert unit, coords
+    assert unit.coords, unit
 
     self.underlying[x][y] = None
-    piece.coords = None
-    group = self.group_pieces_by(piece)
-    self.pieces[group].remove(piece)
-    return piece
+    unit.coords = None
+    group = self.group_units_by(unit)
+    self.units[group].remove(unit)
+    return unit
 
-  def get_piece(self, coords):
+  def get_unit(self, coords):
     x, y = self._get_coords(coords)
     return self.underlying[x][y]
 
-  def get_pieces_grouped(self):
-    return self.pieces
+  def get_units_grouped(self):
+    return self.units
 
   def _get_coords(self, coords):
     x, y = coords
@@ -48,30 +48,40 @@ class Board2D:
     assert 0 <= y <= self.y_size - 1, y
     return x, y
 
-def move(board, from_, to, virtual = False):
-  piece = board.remove(from_, virtual)
-  board.place(to, piece, virtual)
+def move(field, from_, to, virtual = False):
+  unit = field.remove(from_, virtual)
+  field.place(to, unit, virtual)
 
-def replace(board, coords, piece, virtual = False):
-  board.remove(coords, virtual)
-  board.place(coords, piece, virtual)
+def replace(field, coords, unit, virtual = False):
+  field.remove(coords, virtual)
+  field.place(coords, unit, virtual)
 
-def remove_if_placed(board, coords, virtual = False):
-  if board.get_piece(coords):
-    return board.remove(coords, virtual)
+def kill(field, from_, to, virtual = False):
+  killed = field.remove(to, virtual)
+  move(field, from_, to, virtual)
+  return killed
+
+def remove_if_placed(field, coords, virtual = False):
+  if field.get_unit(coords):
+    return field.remove(coords, virtual)
   return None
 
-def get_pieces_all(board):
-  return chain.from_iterable(board.get_pieces_grouped().values())
+def kill_if_placed(field, from_, to, virtual = False):
+  killed = remove_if_placed(field, to, virtual)
+  move(field, from_, to, virtual)
+  return killed
+
+def get_units_all(field):
+  return chain.from_iterable(field.get_units_grouped().values())
 
 @contextlib.contextmanager
-def move_virtually(board, from_, to):
-  piece = remove_if_placed(board, to, virtual=True)
-  move(board, from_, to, virtual=True)
+def move_virtually(field, from_, to):
+  unit = remove_if_placed(field, to, virtual=True)
+  move(field, from_, to, virtual=True)
   yield
-  move(board, to, from_, virtual=True)
-  if piece:
-    board.place(to, piece, virtual=True)
+  move(field, to, from_, virtual=True)
+  if unit:
+    field.place(to, unit, virtual=True)
 
 class SegType(Enum):
   LINE = auto()
@@ -104,9 +114,9 @@ def get_segment_coords(from_, to):
 def is_free_segment(segment, segtype):
   return segtype != SegType.NOT_SEGMENT and not list(filter(None, segment))
 
-def get_segment_cells(board, from_, to):
+def get_segment_cells(field, from_, to):
   segment, segtype = get_segment_coords(from_, to)
-  return map(board.get_piece, segment), segtype
+  return map(field.get_unit, segment), segtype
 
 class BlackWhitePieceType(Enum):
   def print(self, color):

@@ -1,7 +1,7 @@
 from logic.io import EvtType, send_event_all
 import logic.cards
 from logic.cardgame import sort_by_rank_suit
-import logic.board
+import logic.field
 
 def deal(players, game, hand_amount = None):
   widdle = logic.cards.deal(players, game.deck, hand_amount)
@@ -25,7 +25,7 @@ def put_card_on_table(player, players, allowed_cards, detached = False):
   send_event_all(players, EvtType.CARD, {"card": card, "from": player})
   return card
 
-class BoardObserver:
+class FieldObserver:
   def __init__(self, underlying, players = []):
     self.underlying = underlying
     self.init_players(players)
@@ -33,28 +33,28 @@ class BoardObserver:
   def init_players(self, players):
     self.players = players
 
-  def place(self, coords, piece, virtual = False):
-    self.underlying.place(coords, piece)
+  def place(self, coords, unit, virtual = False):
+    self.underlying.place(coords, unit)
     if not virtual:
       for p in self.players:
-        p.io.place(coords, piece)
+        p.io.place(coords, unit)
 
   def remove(self, coords, virtual = False):
-    piece = self.underlying.remove(coords)
+    unit = self.underlying.remove(coords)
     if not virtual:
       for p in self.players:
         p.io.remove(coords)
-    return piece
+    return unit
 
-  def get_piece(self, coords):
-    return self.underlying.get_piece(coords)
+  def get_unit(self, coords):
+    return self.underlying.get_unit(coords)
 
-  def get_pieces_grouped(self):
-    return self.underlying.get_pieces_grouped()
+  def get_units_grouped(self):
+    return self.underlying.get_units_grouped()
 
-def board_after_reconnect(board):
+def field_after_reconnect(field):
   def f(io):
-    for piece in logic.board.get_pieces_all(board):
-      io.place(piece.coords, piece)
+    for unit in logic.field.get_units_all(field):
+      io.place(unit.coords, unit)
   return f
 

@@ -2,8 +2,8 @@ from itertools import chain
 
 from lib.util import Color
 import lib.list
-from logic.board import BlackWhitePieceType, Piece, SegType, bw_enemy
-import logic.board
+from logic.field import BlackWhitePieceType, Piece, SegType, bw_enemy
+import logic.field
 
 class ChessPiece(BlackWhitePieceType):
   King = ("♚", "♔")
@@ -26,12 +26,12 @@ class Chess:
 
   def is_valid_move(self, piece, to):
     color = piece.color
-    target = self.board.get_piece(to)
+    target = self.board.get_unit(to)
 
     if target and target.color == color:
       return False
 
-    with logic.board.move_virtually(self.board, piece.coords, to):
+    with logic.field.move_virtually(self.board, piece.coords, to):
       if self.is_check(color):
         return False
 
@@ -40,13 +40,13 @@ class Chess:
 
   def _is_valid_move_internal(self, piece, to):
     color = piece.color
-    target = self.board.get_piece(to)
+    target = self.board.get_unit(to)
     x1, y1 = piece.coords
     x2, y2 = to
     delta_x = abs(x2 - x1)
     abs_delta = {delta_x, abs(y2 - y1)}
-    segment, segtype = logic.board.get_segment_cells(self.board, piece.coords, to)
-    is_free_segment = logic.board.is_free_segment(segment, segtype)
+    segment, segtype = logic.field.get_segment_cells(self.board, piece.coords, to)
+    is_free_segment = logic.field.is_free_segment(segment, segtype)
 
     assert not target or target.color != color
 
@@ -59,7 +59,7 @@ class Chess:
           self.last_double_step_pawn[color] = piece
         return True
 
-      cell = self.board.get_piece([x2, y1])
+      cell = self.board.get_unit([x2, y1])
       is_en_passant = bool(cell) and cell == self.last_double_step_pawn[bw_enemy(color)]
       if delta_x == 1 and is_one_step and (target or is_en_passant):
         if is_en_passant:
@@ -89,7 +89,7 @@ class Chess:
     }[piece.type]
 
   def move(self, piece, to):
-    logic.board.kill_if_placed(self.board, piece.coords, to)
+    logic.field.kill_if_placed(self.board, piece.coords, to)
     self._castling(piece.color)
     self._en_passant(piece)
 
@@ -100,12 +100,12 @@ class Chess:
 
     rook_x = 0 if x1 > x2 else 7
     rook_y = self._own_side_y(0, color)
-    rook = self.board.get_piece([rook_x, rook_y])
+    rook = self.board.get_unit([rook_x, rook_y])
     if rook not in self.unmoved_castlers[color]:
       return False
 
-    res = logic.board.get_segment_cells(self.board, piece.coords, [rook_x, rook_y])
-    if logic.board.is_free_segment(*res):
+    res = logic.field.get_segment_cells(self.board, piece.coords, [rook_x, rook_y])
+    if logic.field.is_free_segment(*res):
       return False
     
     cross_cell_x = x1 - 1 if x1 > x2 else x1 + 1
@@ -123,7 +123,7 @@ class Chess:
     x, y = rook.coords
     x2 = 3 if x == 0 else 5
 
-    logic.board.move(self.board, rook.coords, [x2, y])
+    logic.field.move(self.board, rook.coords, [x2, y])
 
   def _en_passant(self, piece):
     if not self.is_en_passant_last:
@@ -138,7 +138,7 @@ class Chess:
     self.last_double_step_pawn[enemy_color] = None
 
   def is_under_attack(self, color, coords):
-    enemy_pieces = self.board.get_pieces_grouped()[bw_enemy(color)]
+    enemy_pieces = self.board.get_units_grouped()[bw_enemy(color)]
     return any(p for p in enemy_pieces if p.coords and self._is_valid_move_internal(p, coords))
 
   def is_check(self, color):

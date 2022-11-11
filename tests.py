@@ -7,8 +7,8 @@ import logic.game
 from logic.cards import Rank, Suit, card
 import logic.cards
 from logic.cardgame import hitting_card
-from logic.board import SegType
-import logic.board
+from logic.field import SegType
+import logic.field
 from logic.game.goat import Goat
 import logic.game.thousand as t
 import logic.game.fool as f
@@ -296,21 +296,21 @@ new_cards = f.replenish_cards(cards, deck)
 assert len(new_cards) == 0
 assert len(deck) == 0
 
-assert logic.board.get_segment_coords([5, 0], [0, 0]) == ([[1, 0], [2, 0], [3, 0], [4, 0]], SegType.LINE)
-assert logic.board.get_segment_coords([3, 5], [5, 5]) == ([[4, 5]], SegType.LINE)
-assert logic.board.get_segment_coords([2, 6], [2, 2]) == ([[2, 3], [2, 4], [2, 5]], SegType.LINE)
-assert logic.board.get_segment_coords([6, 7], [6, 4]) == ([[6, 5], [6, 6]], SegType.LINE)
-assert logic.board.get_segment_coords([4, 4], [8, 8]) == ([[5, 5], [6, 6], [7, 7]], SegType.DIAG)
-assert logic.board.get_segment_coords([8, 4], [5, 1]) == ([[6, 2], [7, 3]], SegType.DIAG)
-assert logic.board.get_segment_coords([3, 7], [6, 4]) == ([[4, 6], [5, 5]], SegType.DIAG)
-assert logic.board.get_segment_coords([6, 7], [6, 7]) == ([], SegType.LINE)
-assert logic.board.get_segment_coords([6, 7], [6, 8]) == ([], SegType.LINE)
-assert logic.board.get_segment_coords([6, 7], [4, 4]) == ([], SegType.NOT_SEGMENT)
+assert logic.field.get_segment_coords([5, 0], [0, 0]) == ([[1, 0], [2, 0], [3, 0], [4, 0]], SegType.LINE)
+assert logic.field.get_segment_coords([3, 5], [5, 5]) == ([[4, 5]], SegType.LINE)
+assert logic.field.get_segment_coords([2, 6], [2, 2]) == ([[2, 3], [2, 4], [2, 5]], SegType.LINE)
+assert logic.field.get_segment_coords([6, 7], [6, 4]) == ([[6, 5], [6, 6]], SegType.LINE)
+assert logic.field.get_segment_coords([4, 4], [8, 8]) == ([[5, 5], [6, 6], [7, 7]], SegType.DIAG)
+assert logic.field.get_segment_coords([8, 4], [5, 1]) == ([[6, 2], [7, 3]], SegType.DIAG)
+assert logic.field.get_segment_coords([3, 7], [6, 4]) == ([[4, 6], [5, 5]], SegType.DIAG)
+assert logic.field.get_segment_coords([6, 7], [6, 7]) == ([], SegType.LINE)
+assert logic.field.get_segment_coords([6, 7], [6, 8]) == ([], SegType.LINE)
+assert logic.field.get_segment_coords([6, 7], [4, 4]) == ([], SegType.NOT_SEGMENT)
 
 if args.integration:
   games = {
     "goat": (goat.players_number, 5),
-    "thousand": (thousand.players_number, 10),
+    "thousand": (thousand.players_number, 10)
   }
 
   for game, (players_number, test_duration) in games.items():

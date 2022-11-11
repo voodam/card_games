@@ -47,13 +47,13 @@ class EvtType(Enum):
   SELECT_CARD_RESPONSE = auto()
   SELECT_SUIT_RESPONSE = auto()
 
-  # board to client
-  BOARD_PLACE = auto()
-  BOARD_REMOVE = auto()
-  SELECT_BOARD_MOVE = auto()
+  # field to client
+  FIELD_PLACE = auto()
+  FIELD_REMOVE = auto()
+  SELECT_FIELD_MOVE = auto()
   SELECT_PROMOTION = auto()
-  # board to server
-  SELECT_BOARD_MOVE_RESPONSE = auto()
+  # field to server
+  SELECT_FIELD_MOVE_RESPONSE = auto()
   SELECT_PROMOTION_RESPONSE = auto()
 
   def __str__(self):
@@ -241,23 +241,23 @@ class CardRandomIO(CardConsoleIO):
     print(f"[{self.player}, {evt_type}] ", end="" if payload else "\n")
     ConsoleIO.send_event(self, evt_type, payload)
 
-class BoardSocketIO(SocketIO):  
+class FieldSocketIO(SocketIO):  
   def select_move(self):
     try:
-      send_event(self.conn, EvtType.SELECT_BOARD_MOVE)
-      return listen_event(self.conn, EvtType.SELECT_BOARD_MOVE_RESPONSE)
+      send_event(self.conn, EvtType.SELECT_FIELD_MOVE)
+      return listen_event(self.conn, EvtType.SELECT_FIELD_MOVE_RESPONSE)
     except ConnectionError:
       self._reconnect()
       return self.select_move()
 
-  def place(self, coords, piece):
-    self.send_event(EvtType.BOARD_PLACE, {"coords": coords, "piece": piece})
+  def place(self, coords, unit):
+    self.send_event(EvtType.FIELD_PLACE, {"coords": coords, "unit": unit})
 
   def remove(self, coords):
-    self.send_event(EvtType.BOARD_REMOVE, coords)
+    self.send_event(EvtType.FIELD_REMOVE, coords)
 
-  def select_promotion(self, piece_types):
-    return self._select(piece_types, EvtType.SELECT_PROMOTION, EvtType.SELECT_PROMOTION_RESPONSE)
+  def select_promotion(self, unit_types):
+    return self._select(unit_types, EvtType.SELECT_PROMOTION, EvtType.SELECT_PROMOTION_RESPONSE)
 
 def add_socket_args(arg_parser):
   arg_parser.add_argument("--host", type=str, nargs="?", default="127.0.0.1", help="Server host")
@@ -272,7 +272,7 @@ def add_cli_args(arg_parser):
 
 class GameType(Enum):
   CARD = (CardSocketIO, CardConsoleIO, CardRandomIO)
-  BOARD = (BoardSocketIO, None, None)
+  FIELD = (FieldSocketIO, None, None)
 
 def new_players(players_number, io_mode, cpu_players, host, port, websocket_port, frontend_port, 
                 game_type = GameType.CARD, after_reconnect = lambda io: io.send_event(EvtType.DEAL, io.player.cards), **_):

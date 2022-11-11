@@ -1,12 +1,12 @@
 const EvtType = {
   // to client
-  BOARD_PLACE: "BOARD_PLACE",
-  BOARD_REMOVE: "BOARD_REMOVE",
-  SELECT_BOARD_MOVE: "SELECT_BOARD_MOVE",
+  FIELD_PLACE: "FIELD_PLACE",
+  FIELD_REMOVE: "FIELD_REMOVE",
+  SELECT_FIELD_MOVE: "SELECT_FIELD_MOVE",
   SELECT_PROMOTION: "SELECT_PROMOTION",
   // to server
   ENTER: "ENTER",
-  SELECT_BOARD_MOVE_RESPONSE: "SELECT_BOARD_MOVE_RESPONSE",
+  SELECT_FIELD_MOVE_RESPONSE: "SELECT_FIELD_MOVE_RESPONSE",
   SELECT_PROMOTION_RESPONSE: "SELECT_PROMOTION_RESPONSE"
 }
 
@@ -72,12 +72,12 @@ class Board {
 const board = new Board(q("#board"))
 
 const common_events = io => {
-  io.listen(EvtType.BOARD_PLACE, ({piece, coords}) => board.place(piece, coords))
-  io.listen(EvtType.BOARD_REMOVE, coords => board.remove(coords))
+  io.listen(EvtType.FIELD_PLACE, ({unit, coords}) => board.place(unit, coords))
+  io.listen(EvtType.FIELD_REMOVE, coords => board.remove(coords))
 }
 
 const personal_events = io => {
-  ws_listen_send(io, EvtType.SELECT_BOARD_MOVE, () => board.select_move(), EvtType.SELECT_BOARD_MOVE_RESPONSE)
-  ws_listen_send(io, EvtType.SELECT_PROMOTION, piece_types => "♛", EvtType.SELECT_PROMOTION_RESPONSE)
+  ws_listen_send(io, EvtType.SELECT_FIELD_MOVE, () => board.select_move(), EvtType.SELECT_FIELD_MOVE_RESPONSE)
+  ws_listen_send(io, EvtType.SELECT_PROMOTION, unit_types => "♛", EvtType.SELECT_PROMOTION_RESPONSE)
 }
 
