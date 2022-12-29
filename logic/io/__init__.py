@@ -30,6 +30,7 @@ class IOMode(Flag):
     return self.name
 
 class EvtType(Enum):
+  ENTER = auto()
   # cards to client
   TEXT = auto()
   TRICK = auto()
@@ -41,7 +42,6 @@ class EvtType(Enum):
   SELECT_CARD = auto()
   SELECT_SUIT = auto()
   # cards to server
-  ENTER = auto()
   SELECT_YESNO_RESPONSE = auto()
   SELECT_BID_RESPONSE = auto()
   SELECT_CARD_RESPONSE = auto()

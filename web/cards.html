@@ -16,11 +16,13 @@
     <div id="trump" style="position: absolute; top: 0px; right: 0px; width: 10%"></div>
 
     <script src="util.js"></script>
+    <script src="evt_type.js"></script>
     <script src="common_ui.js"></script>
     <script src="cards.js"></script>
     <script>
       const container = q("#enter")
-      const handler = enter_click_handler(container, WEBSOCKET_URL, personal_events, common_events)
+      const ws_url = url_params.get("websocket_url") || `ws://${location.hostname}:8080`
+      const handler = enter_click_handler(container, ws_url, personal_events, common_events)
       create_enter_buttons(container, handler)
     </script>
   </body>

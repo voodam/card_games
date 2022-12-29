@@ -8,18 +8,28 @@ if (under_node_js) {
 
 const id = v => v
 const noop = () => {}
+const always = () => true
 
-const skip_first = (cb, label) => {
-  if (skip_first.labels.has(label))
-    cb()
-  else
-    skip_first.labels.add(label)
+const repeat = (times, cb) => {
+  for (let i = 0; i < times; ++i) cb()
 }
-skip_first.labels = new Set()
 
 const array_equals = (a, b) =>
   a.length === b.length &&
   a.every((v, i) => v === b[i])
+
+const memoize = (fn) => {
+  let cache = {}
+  return (...args) => {
+    let n = args[0] // just taking one argument here
+    if (n in cache)
+      return cache[n]
+
+    const result = fn(n)
+    cache[n] = result
+    return result
+  }
+}
 
 class SimpleWebsocket {
   static HANDLE_ONCE = "__once__"
@@ -82,8 +92,15 @@ const listen_once = (element, event_name, callback) => {
 const promise_timeout = (cb, delay) => new Promise(resolve =>
   setTimeout(() => resolve(cb()), delay))
 
+const url_params = new URLSearchParams(window.location && window.location.search)
 const q = (selector, element = document) => element.querySelector(selector)
 const q_all = (selector, element = document) => Array.from(element.querySelectorAll(selector))
+
+const append_element = (container, tag_name, options = {}) => {
+  const el = document.createElement(tag_name, options)
+  container.appendChild(el);
+  return el
+}
 
 async function translate(query, target_lang) {
   const response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&q=${query}&tl=${target_lang}`)

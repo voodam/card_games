@@ -1,27 +1,6 @@
-const EvtType = {
-  // to client
-  TEXT: "TEXT",
-  TRICK: "TRICK",
-  DEAL: "DEAL",
-  TRUMP: "TRUMP",
-  CARD: "CARD",
-  SELECT_YESNO: "SELECT_YESNO",
-  SELECT_BID: "SELECT_BID",
-  SELECT_CARD: "SELECT_CARD",
-  SELECT_SUIT: "SELECT_SUIT",
-  // to server
-  ENTER: "ENTER",
-  SELECT_YESNO_RESPONSE: "SELECT_YESNO_RESPONSE",
-  SELECT_BID_RESPONSE: "SELECT_BID_RESPONSE",
-  SELECT_CARD_RESPONSE: "SELECT_CARD_RESPONSE",
-  SELECT_SUIT_RESPONSE: "SELECT_SUIT_RESPONSE"
-}
-
-const params = new URLSearchParams(location.search)
-const TEXT_DELAY_MS = params.get("text_delay") || 3000
-const SHOW_HAND_DELAY_MS = params.get("show_hand_delay") || 5000
-const TABLE_CLEAR_DELAY_MS = params.get("table_clear_delay") || 3000
-const WEBSOCKET_URL = params.get("websocket_url") || `ws://${location.hostname}:8080`
+const TEXT_DELAY_MS = url_params.get("text_delay") || 3000
+const SHOW_HAND_DELAY_MS = url_params.get("show_hand_delay") || 5000
+const TABLE_CLEAR_DELAY_MS = url_params.get("table_clear_delay") || 3000
 
 class Deck {
   constructor(container) {
@@ -148,7 +127,7 @@ class MessageBox {
 const listen_showhide = (io, hand, req_event, cb, resp_event) =>
   ws_listen_send(io, req_event, async payload => {
     await show_hand(hand)
-    // Async JS works bad with blocking standart popups (confirm and prompt functions),
+    // Async JS works badly with blocking standart popups (confirm and prompt functions),
     // timeout mostly solves this problem.
     const res = await promise_timeout(() => cb(payload), 100)
     hide_hand(hand)

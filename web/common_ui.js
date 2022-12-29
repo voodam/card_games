@@ -8,8 +8,7 @@ const create_enter_buttons = (buttons_container, click_handler) => {
     return input
   }
 
-  const params = new URLSearchParams(location.search)
-  const players = params.getAll("player")
+  const players = url_params.getAll("player")
   for (const p of players)
     buttons_container.appendChild(create_button(p))
 }

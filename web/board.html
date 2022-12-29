@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <style>
+      #board td {position: relative}
+      #board td > div {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 12vh;
+      }
+  
+      #board.chess tr:nth-child(even) td:nth-child(odd), 
+      #board.chess tr:nth-child(odd) td:nth-child(even) {background: grey}
+    </style>
+  </head>
+  <body style="margin: 0; overflow: hidden">
+    <div id="enter" style="position: absolute; z-index: 1"></div>
+    <table id="board" style="margin: auto; width: 100vh; height: 100vh">
+    </table>
+
+    <script src="util.js"></script>
+    <script src="evt_type.js"></script>
+    <script src="common_ui.js"></script>
+    <script src="board.js"></script>
+    <script>
+      const board_container = q("#board")
+      board_container.classList.add(game_name)
+      const [x_size, y_size] = game.board_size()
+      repeat(y_size, () => {
+        const tr = append_element(board_container, "tr")
+        repeat(x_size, () => {
+          const td = append_element(tr, "td")
+          append_element(td, "div")
+        })
+      })
+
+      const enter_container = q("#enter")
+      const ws_url = url_params.get("websocket_url") || `ws://${location.hostname}:8080`
+      const handler = enter_click_handler(enter_container, ws_url, game.personal_events.bind(game), game.common_events.bind(game))
+      create_enter_buttons(enter_container, handler)
+    </script>
+  </body>
+</html>
+
